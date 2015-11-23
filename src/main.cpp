@@ -97,7 +97,7 @@ namespace Letvetzi {
         }
     }
     
-    void event_handler(Game::sdl_info&           gs         ,
+    void event_handler(/*Game::sdl_info&           gs         ,*/
                        Conc::Chan<SDL_Event>&    sdl_events ,
                        Conc::Chan<Events::Type>& game_events) {
         while(true) {
@@ -108,7 +108,6 @@ namespace Letvetzi {
                          break;
                 case SDL_KEYDOWN:
                         if(ev.key.repeat == 0) {
-                            printf("KeyDown\n");
                             switch(ev.key.keysym.sym) {
                                 case SDLK_UP:    game_events.push(Events::move(0,-50));
                                                 break;
@@ -123,7 +122,6 @@ namespace Letvetzi {
                         }
                         break;
                 case SDL_KEYUP:
-                        printf("KeyUp\n");
                         switch(ev.key.keysym.sym) {
                             case SDLK_UP:    game_events.push(Events::move(0,+50));
                                              break;
@@ -140,7 +138,7 @@ namespace Letvetzi {
             }
         }
     };
-    void game_handler(Game::sdl_info&               gs          ,
+    void game_handler(/*Game::sdl_info&               gs          ,*/
                       Conc::Chan<Events::Type>&     game_events ,
                       Conc::VarL<GameState::Type>&  svar        ) {
         while(true) {
@@ -172,10 +170,10 @@ namespace Letvetzi {
                               uint16_t                     fps_relation) {
         return svar.modify([&](GameState::Type& s) {
             { // apply "velocity" to the player
-                s.player.x += (s.player.vel.x * s.res.height * fps_relation) /100/1000;
-                s.player.y += (s.player.vel.y * s.res.width  * fps_relation) /100/1000;
-                s.player.x = std::max<uint16_t>(0, std::min(s.player.x, s.res.height));
-                s.player.y = std::max<uint16_t>(0, std::min(s.player.y, s.res.width));
+                int16_t p_x = s.player.x + (s.player.vel.x * s.res.height * fps_relation) /100/1000;
+                int16_t p_y = s.player.y + (s.player.vel.y * s.res.width  * fps_relation) /100/1000;
+                s.player.x = std::max<int16_t>(0, std::min<int16_t>(p_x, s.res.height));
+                s.player.y = std::max<int16_t>(0, std::min<int16_t>(p_y, s.res.width));
             }
             // apply background
             SDL_SetRenderDrawColor(gs.win_renderer, 0, 0, 0, 255);
@@ -195,7 +193,7 @@ namespace Letvetzi {
         });
     }
 };
-int main(int argc, char** args) {
+int main(/*int argc, char** args*/) {
 
     try {
         if(SDL_Init(SDL_INIT_VIDEO) < 0) { throw Game::SDLError(); }
@@ -214,13 +212,15 @@ int main(int argc, char** args) {
                         );
 
         std::function<void(Conc::Chan<SDL_Event>&,Conc::Chan<Letvetzi::Events::Type>&)> event_fn =
+                Letvetzi::event_handler; /*
                 [&](Conc::Chan<SDL_Event>& s_ev, Conc::Chan<Letvetzi::Events::Type>& g_ev) {
                             return Letvetzi::event_handler(gs, s_ev, g_ev);
-                        };
+                        }; */
         std::function<void(Conc::Chan<Letvetzi::Events::Type>&,Conc::VarL<Letvetzi::GameState::Type>&)> game_fn =
+                Letvetzi::game_handler; /*
                 [&](Conc::Chan<Letvetzi::Events::Type>& g_ev, Conc::VarL<Letvetzi::GameState::Type>& typ) {
                             return Letvetzi::game_handler(gs, g_ev, typ);
-                        };
+                        };*/
         std::function<Game::LSit(Conc::VarL<Letvetzi::GameState::Type>&,uint16_t)> render_fn =
                 [&](Conc::VarL<Letvetzi::GameState::Type>& typ,uint16_t fps_rel) {
                             return Letvetzi::render_handler(gs,typ,fps_rel);
