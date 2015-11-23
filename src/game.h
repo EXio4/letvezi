@@ -56,10 +56,10 @@ namespace Game {
                 if (fps_param > 0) fps = fps_param;
             }
             ~sdl_info() {
-                SDL_DestroyWindow(window);
                 for (const auto &pair : map) {
                     SDL_DestroyTexture(pair.second);
                 }
+                SDL_DestroyWindow(window);
             }
             void load_png(std::string key, std::string path) {
                  {

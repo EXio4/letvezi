@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <SDL2/SDL.h>
 #include <stdio.h>
+#include <algorithm>
 #include "game.h"
 
 const int SCREEN_WIDTH = 640;
@@ -96,7 +97,7 @@ namespace Letvetzi {
         }
     }
     
-    void event_handler(Game::sdl_info            gs         ,
+    void event_handler(Game::sdl_info&           gs         ,
                        Conc::Chan<SDL_Event>&    sdl_events ,
                        Conc::Chan<Events::Type>& game_events) {
         while(true) {
@@ -106,27 +107,31 @@ namespace Letvetzi {
                          game_events.push(Events::quitGame());
                          break;
                 case SDL_KEYDOWN:
-                        switch(ev.key.keysym.sym) {
-                            case SDLK_UP:    game_events.push(Events::move(+25, 0 ));
-                                             break;
-                            case SDLK_DOWN:  game_events.push(Events::move(-25, 0 ));
-                                             break;
-                            case SDLK_LEFT:  game_events.push(Events::move( 0 ,+25));
-                                             break;
-                            case SDLK_RIGHT: game_events.push(Events::move( 0 ,-25));
-                                             break;
-                            default: break;
+                        if(ev.key.repeat == 0) {
+                            printf("KeyDown\n");
+                            switch(ev.key.keysym.sym) {
+                                case SDLK_UP:    game_events.push(Events::move(0,-50));
+                                                break;
+                                case SDLK_DOWN:  game_events.push(Events::move(0,+50));
+                                                break;
+                                case SDLK_LEFT:  game_events.push(Events::move(-50,0));
+                                                break;
+                                case SDLK_RIGHT: game_events.push(Events::move(+50,0));
+                                                break;
+                                default: break;
+                            }
                         }
                         break;
                 case SDL_KEYUP:
+                        printf("KeyUp\n");
                         switch(ev.key.keysym.sym) {
-                            case SDLK_UP:    game_events.push(Events::move(-25, 0 ));
+                            case SDLK_UP:    game_events.push(Events::move(0,+50));
                                              break;
-                            case SDLK_DOWN:  game_events.push(Events::move(+25, 0 ));
+                            case SDLK_DOWN:  game_events.push(Events::move(0,-50));
                                              break;
-                            case SDLK_LEFT:  game_events.push(Events::move( 0, -25));
+                            case SDLK_LEFT:  game_events.push(Events::move(+50,0));
                                              break;
-                            case SDLK_RIGHT: game_events.push(Events::move( 0 ,+25));
+                            case SDLK_RIGHT: game_events.push(Events::move(-50,0));
                                              break;
                             default: break;
                         }
@@ -135,7 +140,7 @@ namespace Letvetzi {
             }
         }
     };
-    void game_handler(Game::sdl_info                gs          ,
+    void game_handler(Game::sdl_info&               gs          ,
                       Conc::Chan<Events::Type>&     game_events ,
                       Conc::VarL<GameState::Type>&  svar        ) {
         while(true) {
@@ -162,13 +167,15 @@ namespace Letvetzi {
      * 
      * the speed unit used internally, is defined as `1u = 1% of the screen` approx.
      */
-    Game::LSit render_handler(Game::sdl_info               gs,
+    Game::LSit render_handler(Game::sdl_info&              gs,
                               Conc::VarL<GameState::Type>& svar,
                               uint16_t                     fps_relation) {
         return svar.modify([&](GameState::Type& s) {
             { // apply "velocity" to the player
-                s.player.x += (s.player.vel.x * s.res.width) /100/1000;
-                s.player.y += (s.player.vel.y * s.res.height)/100/1000;
+                s.player.x += (s.player.vel.x * s.res.height * fps_relation) /100/1000;
+                s.player.y += (s.player.vel.y * s.res.width  * fps_relation) /100/1000;
+                s.player.x = std::max<uint16_t>(0, std::min(s.player.x, s.res.height));
+                s.player.y = std::max<uint16_t>(0, std::min(s.player.y, s.res.width));
             }
             // apply background
             SDL_SetRenderDrawColor(gs.win_renderer, 0, 0, 0, 255);
@@ -220,6 +227,9 @@ int main(int argc, char** args) {
                         };
 
         gs.loop(event_fn, game_fn, render_fn, start_state);
+
+        printf("Game over!\n");
+
 
     } catch (Game::SDLError& err) {
         printf("SDL Error: %s\n", err.what());
