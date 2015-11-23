@@ -49,7 +49,7 @@ namespace Game {
             std::map<std::string, SDL_Texture*> map;
             /* std::string til I manage to stop being lazy */
 
-            sdl_info(char* game_name, int width, int height, int fps_param=60) {
+            sdl_info(const char* game_name, int width, int height, int fps_param=60) {
                 window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_SHOWN);
                 if (window == NULL) { throw SDLError(); }
                 win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED );
@@ -119,8 +119,8 @@ namespace Game {
                     auto t_start = std::chrono::steady_clock::now();
                     LSit x = render_handler(game_state, fps_relation);
                     switch(x) {
-                        BreakLoop: return;
-                                   break;
+                        case BreakLoop: return;
+                                        break;
                         default:   break;
                     }
                     auto t_finish = std::chrono::steady_clock::now();
@@ -129,7 +129,7 @@ namespace Game {
 
                     SDL_RenderPresent(win_renderer);
 
-                    if (sleep_time > std::chrono::milliseconds(0)) {
+                    if (sleep_time > std::chrono::milliseconds(0)) {    
                         std::this_thread::sleep_for(sleep_time);
                     }
                 }

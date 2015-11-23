@@ -102,10 +102,10 @@ namespace Letvetzi {
         while(true) {
             SDL_Event ev = sdl_events.pop();
             switch(ev.type) {
-                SDL_QUIT:
+                case SDL_QUIT:
                          game_events.push(Events::quitGame());
                          break;
-                SDL_KEYDOWN:
+                case SDL_KEYDOWN:
                         switch(ev.key.keysym.sym) {
                             case SDLK_UP:    game_events.push(Events::move(+25, 0 ));
                                              break;
@@ -118,7 +118,7 @@ namespace Letvetzi {
                             default: break;
                         }
                         break;
-                SDL_KEYUP:
+                case SDL_KEYUP:
                         switch(ev.key.keysym.sym) {
                             case SDLK_UP:    game_events.push(Events::move(-25, 0 ));
                                              break;
@@ -141,12 +141,12 @@ namespace Letvetzi {
         while(true) {
             Events::Type ev = game_events.pop();
             switch(ev.tag) {
-                QuitGame:
+                case Events::Type::QuitGame:
                     svar.modify([](GameState::Type& s) {
                         s.quit = true;
                     });
                 break;
-                Move:
+                case Events::Type::Move:
                     svar.modify([&](GameState::Type& s) {
                         s.player.vel.x += ev.data.vel.x;
                         s.player.vel.y += ev.data.vel.y;
@@ -165,16 +165,16 @@ namespace Letvetzi {
     Game::LSit render_handler(Game::sdl_info               gs,
                               Conc::VarL<GameState::Type>& svar,
                               uint16_t                     fps_relation) {
-        svar.modify([&](GameState::Type& s) {
+        return svar.modify([&](GameState::Type& s) {
             { // apply "velocity" to the player
                 s.player.x += (s.player.vel.x * s.res.width) /100/1000;
                 s.player.y += (s.player.vel.y * s.res.height)/100/1000;
             }
-            /* apply background */
+            // apply background
             SDL_SetRenderDrawColor(gs.win_renderer, 0, 0, 0, 255);
             SDL_RenderClear(gs.win_renderer);
 
-            /* draw player */
+            // draw player
             gs.with("player", [&](SDL_Texture *player) {
                 SDL_Rect r;
                 r.x = s.player.x;
@@ -183,6 +183,7 @@ namespace Letvetzi {
                 r.w = 128;
                 SDL_RenderCopy(gs.win_renderer, player, NULL, &r);
             });
+            if (s.quit) return Game::BreakLoop;
             return Game::KeepLooping;
         });
     }
