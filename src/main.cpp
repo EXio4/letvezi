@@ -96,22 +96,22 @@ namespace Letvetzi {
                 { std::random_device rd;
                   std::default_random_engine r_eg(rd());;
                   std::uniform_int_distribution<uint16_t> start_pos(0, res.width); // start positions \x -> (x,0)
-                  std::uniform_int_distribution<int16_t> start_speed(40,70); // speed
+                  std::uniform_int_distribution<int16_t> start_speed(40,100); // speed
                   bg_particles_gen.random_eng = r_eg;
                   bg_particles_gen.start_pos = start_pos;
                   bg_particles_gen.start_speed = start_speed;
                 };
                 {
-                    for (int i=0; i<80; i++) {
-                        add_bg_particle();
+                    for (int i=0; i<60; i++) {
+                        add_bg_particle((i*100)%res.height);
                     }
                 };
 
             };
-            void add_bg_particle() {
+            void add_bg_particle(uint16_t start_y=0) {
                 uint16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
                 int16_t  speed = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
-                bg_particles.push_front(Particle("bg_star", Position(x,0,Velocity(0, speed))));
+                bg_particles.push_front(Particle("bg_star", Position(x,start_y,Velocity(0, speed))));
             };
         };
     }
