@@ -33,6 +33,7 @@ namespace Letvetzi {
         Velocity vel;
         Position(uint16_t x_p, uint16_t y_p, Velocity vel_p) : x(x_p), y(y_p), vel(vel_p) {
         };
+        Position() : x(0), y(0), vel(Velocity(0,0)) {};
         void apply_vel(Resolution res, int16_t fps_relation) {
             int16_t p_x = x + (vel.x * res.width * fps_relation) /100/1000;
             int16_t p_y = y + (vel.y * res.height  * fps_relation) /100/1000;
@@ -50,6 +51,29 @@ namespace Letvetzi {
 
     struct EntityName {
         uint16_t entity_id;
+        EntityName(uint16_t e) : entity_id(e) {};
+        EntityName& operator++() {
+            entity_id++;
+            return *this;
+        };
+        bool operator==(const EntityName& other) const {
+            return entity_id == other.entity_id;
+        };
+        bool operator!=(const EntityName& other) const {
+            return entity_id != other.entity_id;
+        };
+        bool operator>=(const EntityName& other) const {
+            return entity_id >= other.entity_id;
+        };
+        bool operator<=(const EntityName& other) const {
+            return entity_id <= other.entity_id;
+        };
+        bool operator< (const EntityName& other) const {
+            return entity_id <  other.entity_id;
+        };
+        bool operator> (const EntityName& other) const {
+            return entity_id >  other.entity_id;
+        };
     };
 
 
@@ -91,6 +115,7 @@ namespace Letvetzi {
                 std::uniform_int_distribution<int16_t> start_speed;
             } bg_particles_gen;
             std::map<EntityName,Position> ent_mp;
+            EntityName last_entity = EntityName(0);
             Type(Resolution res_p, Position player_p, bool quit_p = false)
                : res(res_p), quit(quit_p), player(player_p) {
                 { std::random_device rd;
@@ -113,6 +138,12 @@ namespace Letvetzi {
                 int16_t  speed = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
                 bg_particles.push_front(Particle("bg_star", Position(x,start_y,Velocity(0, speed))));
             };
+
+            void with_new_entity(std::function<void(EntityName,Position&)> fn) {
+                 EntityName e = last_entity;
+                 ++last_entity;
+                 return fn(e,ent_mp[e]);
+            }
         };
     }
 
@@ -224,9 +255,10 @@ int main(/*int argc, char** args*/) {
         }
         Game::sdl_info gs("Letvetzi", SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        gs.load_png("player" , "player.png");
-        gs.load_png("bg_star", "bg_star.png");
-        gs.load_png("enemy_1", "enemy_1.png");
+        gs.load_png("player" , "art/player.png");
+        gs.load_png("bg_star", "art/bg_star.png");
+        gs.load_png("player_laser", "art/player_laser.png");
+        gs.load_png("enemy_1", "art/enemy_1.png");
 
         Letvetzi::GameState::Type start_state =
                    Letvetzi::GameState::Type(
@@ -236,15 +268,9 @@ int main(/*int argc, char** args*/) {
                         );
 
         std::function<void(Conc::Chan<SDL_Event>&,Conc::Chan<Letvetzi::Events::Type>&)> event_fn =
-                Letvetzi::event_handler; /*
-                [&](Conc::Chan<SDL_Event>& s_ev, Conc::Chan<Letvetzi::Events::Type>& g_ev) {
-                            return Letvetzi::event_handler(gs, s_ev, g_ev);
-                        }; */
+                Letvetzi::event_handler;
         std::function<void(Conc::Chan<Letvetzi::Events::Type>&,Conc::VarL<Letvetzi::GameState::Type>&)> game_fn =
-                Letvetzi::game_handler; /*
-                [&](Conc::Chan<Letvetzi::Events::Type>& g_ev, Conc::VarL<Letvetzi::GameState::Type>& typ) {
-                            return Letvetzi::game_handler(gs, g_ev, typ);
-                        };*/
+                Letvetzi::game_handler;
         std::function<Game::LSit(Conc::VarL<Letvetzi::GameState::Type>&,uint16_t)> render_fn =
                 [&](Conc::VarL<Letvetzi::GameState::Type>& typ,uint16_t fps_rel) {
                             return Letvetzi::Render::handler(gs,typ,fps_rel);
