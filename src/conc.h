@@ -9,10 +9,10 @@ template <typename T>
 class VarL {
     private:
         T    val;
-
         std::mutex mutex_;
+
     public:
-        VarL(T w) {
+        VarL(T w) : val(w) {
             val = w;
         }
         template <typename FN>
