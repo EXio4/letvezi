@@ -180,7 +180,7 @@ namespace Letvetzi {
     void event_handler(Conc::Chan<SDL_Event>&    sdl_events ,
                        Conc::Chan<Events::Type>& game_events) {
         while(true) {
-            SDL_Event ev = sdl_events.pop();
+            SDL_Event ev = *(sdl_events.pop());
             switch(ev.type) {
                 case SDL_QUIT:
                          game_events.push(Events::QuitGame());
@@ -219,9 +219,9 @@ namespace Letvetzi {
     void game_handler(Conc::Chan<Events::Type>&     game_events ,
                       Conc::VarL<GameState::Type>&  svar        ) {
         while(true) {
-            Events::Type ev = game_events.pop();
+            std::unique_ptr<Events::Type> ev = game_events.pop();
             svar.modify([&](GameState::Type& s) {
-                return ev.apply_gs_change(s);
+                return (*ev).apply_gs_change(s);
             });
         };
     };
