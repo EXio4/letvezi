@@ -4,6 +4,7 @@
 #include <list>
 #include <random>
 #include <algorithm>
+#include <boost/variant.hpp>
 #include "game.h"
 
 const int SCREEN_WIDTH  = 640;
@@ -140,39 +141,46 @@ namespace Letvetzi {
 
 
     namespace Events {
-        class Type {
+        class QuitGame {
             public:
-                virtual void apply_gs_change(GameState::Type&) = 0;
+                QuitGame() { };
         };
-        class QuitGame : public Type {
+        class PlayerMove {
             public:
-                QuitGame() {
-                };
-                void apply_gs_change(GameState::Type& s) {
-                    s.quit = true;
-                };
-        };
-        class PlayerMove : public Type {
-        private:
-            Velocity vel;
-        public:
-            PlayerMove(int16_t x, int16_t y) : vel(Velocity(x,y)){
-            }
-            void apply_gs_change(GameState::Type& s) {
-                s.player.vel.x += vel.x;
-                s.player.vel.y += vel.y;
-            };
+                Velocity vel;
+                PlayerMove(int16_t x, int16_t y) : vel(Velocity(x,y)){
+                }
         };
 
-        class Shoot : public Type {
+        class Shoot {
+            public:
+                Velocity vel;
+
+                Shoot(int16_t accel)  : vel(Velocity(0,-accel)) {
+                };
+        };
+
+        class ApplyEvent : public boost::static_visitor<void> {
         private:
-            Velocity vel;
+            GameState::Type& s;
         public:
-            Shoot(int16_t accel)  : vel(Velocity(0,-accel)) {
+            ApplyEvent(GameState::Type& s) : s(s) {};
+            void operator()(Shoot ev) const {
+                s.add_bullet(ev.vel);
             };
-            void apply_gs_change(GameState::Type& s) {
-                s.add_bullet(vel);
+            void operator()(PlayerMove ev) const {
+                s.player.vel.x += ev.vel.x;
+                s.player.vel.y += ev.vel.y;
             };
+            void operator()(QuitGame) const {
+                s.quit = true;
+            }
+        };
+
+        struct Type {
+            public:
+                boost::variant<QuitGame, PlayerMove, Shoot> data;
+            Type(boost::variant<QuitGame, PlayerMove, Shoot> data) : data(data) {};
         };
     }
 
@@ -180,34 +188,34 @@ namespace Letvetzi {
     void event_handler(Conc::Chan<SDL_Event>&    sdl_events ,
                        Conc::Chan<Events::Type>& game_events) {
         while(true) {
-            SDL_Event ev = *(sdl_events.pop());
+            SDL_Event ev = sdl_events.pop();
             switch(ev.type) {
                 case SDL_QUIT:
-                         game_events.push(Events::QuitGame());
+                         game_events.push(Events::Type(Events::QuitGame()));
                          break;
                 case SDL_KEYDOWN:
                         if(ev.key.repeat == 0) {
                             switch(ev.key.keysym.sym) {
-                                case SDLK_LEFT:  game_events.push(Events::PlayerMove(-30,0));
+                                case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(-30,0)));
                                                  std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                                                 game_events.push(Events::PlayerMove(-30,0));
+                                                 game_events.push(Events::Type(Events::PlayerMove(-30,0)));
                                                  break;
-                                case SDLK_RIGHT: game_events.push(Events::PlayerMove(+30,0));
+                                case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(+30,0)));
                                                  std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                                                 game_events.push(Events::PlayerMove(+30,0));
+                                                 game_events.push(Events::Type(Events::PlayerMove(+30,0)));
                                                  break;
                             }
-                        }
+                        } 
                         switch(ev.key.keysym.sym) {
-                            case SDLK_SPACE: game_events.push(Events::Shoot(50));
+                            case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(50)));
                                              break;
                         }
                         break;
                 case SDL_KEYUP:
                         switch(ev.key.keysym.sym) {
-                            case SDLK_LEFT:  game_events.push(Events::PlayerMove(+60,0));
+                            case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(+60,0)));
                                              break;
-                            case SDLK_RIGHT: game_events.push(Events::PlayerMove(-60,0));
+                            case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(-60,0)));
                                              break;
                             default: break;
                         }
@@ -219,9 +227,9 @@ namespace Letvetzi {
     void game_handler(Conc::Chan<Events::Type>&     game_events ,
                       Conc::VarL<GameState::Type>&  svar        ) {
         while(true) {
-            std::unique_ptr<Events::Type> ev = game_events.pop();
+            Events::Type ev = game_events.pop();
             svar.modify([&](GameState::Type& s) {
-                return (*ev).apply_gs_change(s);
+                boost::apply_visitor(Events::ApplyEvent(s), ev.data);
             });
         };
     };
