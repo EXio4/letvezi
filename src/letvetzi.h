@@ -221,7 +221,7 @@ namespace Letvetzi {
         while(true) {
             Events::Type ev = game_events.pop();
             svar.modify([&](GameState::Type& s) {
-                return (*ev).apply_gs_change(s);
+                return ev.apply_gs_change(s);
             });
         };
     };
