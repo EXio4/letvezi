@@ -14,9 +14,9 @@ const int SCREEN_HEIGHT = 480;
 
 namespace Letvetzi {
     struct Resolution {
-        uint16_t width;
-        uint16_t height;
-        Resolution(uint16_t width, uint16_t height) : width(width), height(height) {
+        int16_t width;
+        int16_t height;
+        Resolution(int16_t width, int16_t height) : width(width), height(height) {
         }
     };
     struct Velocity {
@@ -28,16 +28,16 @@ namespace Letvetzi {
     };
     struct Position {
         public:
-        uint16_t x;
-        uint16_t y;
+        int16_t x;
+        int16_t y;
         Velocity vel;
-        Position(uint16_t x_p, uint16_t y_p, Velocity vel_p) : x(x_p), y(y_p), vel(vel_p) {
+        Position(int16_t x_p, int16_t y_p, Velocity vel_p) : x(x_p), y(y_p), vel(vel_p) {
         };
         Position() : x(0), y(0), vel(Velocity(0,0)) {};
         void apply_vel(Resolution res, int16_t fps_relation) {
             int16_t p_x = x + (vel.x * res.width * fps_relation) /100/1000;
             int16_t p_y = y + (vel.y * res.height  * fps_relation) /100/1000;
-            x = std::max<int16_t>(0, std::min<int16_t>(p_x, res.width));
+            x = std::max<int16_t>(-64, std::min<int16_t>(p_x, res.width-64));
             y = std::max<int16_t>(0, std::min<int16_t>(p_y, res.height));
         }
     };
@@ -49,39 +49,12 @@ namespace Letvetzi {
         };
     };
 
-    struct EntityName {
-        uint16_t entity_id;
-        EntityName(uint16_t e) : entity_id(e) {};
-        EntityName& operator++() {
-            entity_id++;
-            return *this;
-        };
-        bool operator==(const EntityName& other) const {
-            return entity_id == other.entity_id;
-        };
-        bool operator!=(const EntityName& other) const {
-            return entity_id != other.entity_id;
-        };
-        bool operator>=(const EntityName& other) const {
-            return entity_id >= other.entity_id;
-        };
-        bool operator<=(const EntityName& other) const {
-            return entity_id <= other.entity_id;
-        };
-        bool operator< (const EntityName& other) const {
-            return entity_id <  other.entity_id;
-        };
-        bool operator> (const EntityName& other) const {
-            return entity_id >  other.entity_id;
-        };
-    };
-
-
     namespace Events {
         struct Type {
             enum Tag {
                 QuitGame,
-                Move,
+                Move    ,
+                Shoot   ,
             } tag;
             struct {
                 Velocity vel = Velocity(0,0);
@@ -91,7 +64,7 @@ namespace Letvetzi {
         Type quitGame() {
             Type e;
             e.tag = Type::QuitGame;
-            return e;
+            return e;   
         }
         Type move(int16_t x, int16_t y) {
             Type e;
@@ -99,7 +72,55 @@ namespace Letvetzi {
             e.data.vel = Velocity(x,y);
             return e;
         }
+        Type shoot(int16_t accel) {
+            Type e;
+            e.tag = Type::Shoot;
+            e.data.vel = Velocity(0, -accel);   
+            return e;
+        }
     }
+    
+    namespace Entity {
+        struct Name {
+            uint16_t entity_id;
+            Name(uint16_t e) : entity_id(e) {};
+            Name& operator++() {
+                entity_id++;
+                return *this;
+            };
+            bool operator==(const Name& other) const {
+                return entity_id == other.entity_id;
+            };
+            bool operator!=(const Name& other) const {
+                return entity_id != other.entity_id;
+            };
+            bool operator>=(const Name& other) const {
+                return entity_id >= other.entity_id;
+            };
+            bool operator<=(const Name& other) const {
+                return entity_id <= other.entity_id;
+            };
+            bool operator< (const Name& other) const {
+                return entity_id <  other.entity_id;
+            };
+            bool operator> (const Name& other) const {
+                return entity_id >  other.entity_id;
+            };
+        };
+
+        struct Kind {
+            enum {
+                Bullet,
+            } k;
+        };
+        struct Meta {
+            Kind kind;
+            std::string txt_name;
+            Position pos;
+        };
+
+    }
+
 
     namespace GameState {
 
@@ -111,36 +132,46 @@ namespace Letvetzi {
             std::list<Particle> bg_particles;
             struct {
                 std::default_random_engine random_eng;
-                std::uniform_int_distribution<uint16_t> start_pos;
+                std::uniform_int_distribution<int16_t> start_pos;
                 std::uniform_int_distribution<int16_t> start_speed;
             } bg_particles_gen;
-            std::map<EntityName,Position> ent_mp;
-            EntityName last_entity = EntityName(0);
+            std::map<Entity::Name,Entity::Meta> ent_mp;
+            Entity::Name last_entity = Entity::Name(0);
             Type(Resolution res_p, Position player_p, bool quit_p = false)
                : res(res_p), quit(quit_p), player(player_p) {
                 { std::random_device rd;
                   std::default_random_engine r_eg(rd());;
-                  std::uniform_int_distribution<uint16_t> start_pos(0, res.width); // start positions \x -> (x,0)
+                  std::uniform_int_distribution<int16_t> start_pos(0, res.width); // start positions \x -> (x,0)
                   std::uniform_int_distribution<int16_t> start_speed(40,100); // speed
                   bg_particles_gen.random_eng = r_eg;
                   bg_particles_gen.start_pos = start_pos;
                   bg_particles_gen.start_speed = start_speed;
                 };
                 {
-                    for (int i=0; i<60; i++) {
+                    for (int i=0; i<70; i++) {
                         add_bg_particle((i*100)%res.height);
                     }
                 };
 
             };
-            void add_bg_particle(uint16_t start_y=0) {
-                uint16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
-                int16_t  speed = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
-                bg_particles.push_front(Particle("bg_star", Position(x,start_y,Velocity(0, speed))));
+            void add_bg_particle(int16_t start_y=0) {
+                int16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
+                int16_t speed = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
+                int16_t ysped = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
+                bg_particles.push_front(Particle("bg_star", Position(x,start_y,Velocity(ysped-70, speed))));
             };
 
-            void with_new_entity(std::function<void(EntityName,Position&)> fn) {
-                 EntityName e = last_entity;
+            void add_bullet(Velocity vel) {
+                with_new_entity([&](Entity::Name, Entity::Meta& entity) {
+                    entity.kind.k = Entity::Kind::Bullet;
+                    entity.pos    = player;
+                    entity.txt_name = "player_laser";
+                    entity.pos.vel = vel;
+                });
+            }
+
+            void with_new_entity(std::function<void(Entity::Name,Entity::Meta&)> fn) {
+                 Entity::Name e = last_entity;
                  ++last_entity;
                  return fn(e,ent_mp[e]);
             }
@@ -158,19 +189,26 @@ namespace Letvetzi {
                 case SDL_KEYDOWN:
                         if(ev.key.repeat == 0) {
                             switch(ev.key.keysym.sym) {
-                                case SDLK_LEFT:  game_events.push(Events::move(-50,0));
-                                                break;
-                                case SDLK_RIGHT: game_events.push(Events::move(+50,0));
-                                                break;
-                                default: break;
+                                case SDLK_LEFT:  game_events.push(Events::move(-30,0));
+                                                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                                                 game_events.push(Events::move(-30,0));
+                                                 break;
+                                case SDLK_RIGHT: game_events.push(Events::move(+30,0));
+                                                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                                                 game_events.push(Events::move(+30,0));
+                                                 break;
                             }
+                        }
+                        switch(ev.key.keysym.sym) {
+                            case SDLK_SPACE: game_events.push(Events::shoot(50));
+                                             break;
                         }
                         break;
                 case SDL_KEYUP:
                         switch(ev.key.keysym.sym) {
-                            case SDLK_LEFT:  game_events.push(Events::move(+50,0));
+                            case SDLK_LEFT:  game_events.push(Events::move(+60,0));
                                              break;
-                            case SDLK_RIGHT: game_events.push(Events::move(-50,0));
+                            case SDLK_RIGHT: game_events.push(Events::move(-60,0));
                                              break;
                             default: break;
                         }
@@ -195,6 +233,10 @@ namespace Letvetzi {
                         s.player.vel.y += ev.data.vel.y;
                     });
                 break;
+                case Events::Type::Shoot:
+                    svar.modify([&](GameState::Type& s) {
+                        s.add_bullet(ev.data.vel);
+                    });
                 default:
                 break;
             };
@@ -212,18 +254,22 @@ namespace Letvetzi {
             return svar.modify([&](GameState::Type& s) {
                 s.player.apply_vel(s.res, fps_relation);
                 // apply background
-                SDL_SetRenderDrawColor(gs.win_renderer, 0, 0, 0, 255);
+                SDL_SetRenderDrawColor(gs.win_renderer, 75, 0, 60, 255);
                 SDL_RenderClear(gs.win_renderer);
                 for(auto p = s.bg_particles.begin(); p != s.bg_particles.end() ;) {
                     (*p).pos.apply_vel(s.res, fps_relation);
                     gs.with("bg_star", [&](SDL_Texture *bg_star) {
+                        /* this could be optimized such that we don't query the texture more than once
+                         *  (per frame, or even `just once` in the whole game)
+                         */
                         SDL_Rect r;
                         r.x = (*p).pos.x;
                         r.y = (*p).pos.y;
                         SDL_QueryTexture(bg_star, NULL, NULL, &(r.w), &(r.h));
                         SDL_RenderCopy(gs.win_renderer, bg_star, NULL, &r);
                     });
-                    if ((*p).pos.y >= s.res.height) {
+
+                    if ((*p).pos.y >= s.res.height || (*p).pos.x <= 0 || (*p).pos.x >= s.res.width) {
                         p = s.bg_particles.erase(p);
                         s.add_bg_particle();
                     } else {
@@ -231,6 +277,18 @@ namespace Letvetzi {
                     }
                 }
                 /**/
+
+                /* draw entities on the world */
+                for (auto& x : s.ent_mp) {
+                    x.second.pos.apply_vel(s.res, fps_relation);
+                    gs.with(x.second.txt_name, [&](SDL_Texture *texture) {
+                        SDL_Rect r;
+                        r.x = x.second.pos.x;
+                        r.y = x.second.pos.y;
+                        SDL_QueryTexture(texture, NULL, NULL, &(r.w), &(r.h));
+                        SDL_RenderCopy(gs.win_renderer, texture, NULL, &r);
+                    });
+                }
 
                 // draw player
                 gs.with("player", [&](SDL_Texture *player) {

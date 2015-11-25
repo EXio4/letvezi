@@ -111,13 +111,14 @@ namespace Game {
                 gevs_th.detach(); 
                 uint16_t fps_relation = 1000/fps;
 
+                auto debt = std::chrono::milliseconds(0);
                 while(true) {
                     SDL_Event e;
                     while( SDL_PollEvent(&e) != 0) {
                         sdl_events.push(e);
                     }
                     auto t_start = std::chrono::steady_clock::now();
-                    LSit x = render_handler(game_state, fps_relation);
+                    LSit x = render_handler(game_state, fps_relation + debt.count());
                     switch(x) {
                         case BreakLoop: return;
                                         break;
@@ -129,8 +130,13 @@ namespace Game {
 
                     SDL_RenderPresent(win_renderer);
 
-                    if (sleep_time > std::chrono::milliseconds(0)) {    
+                    if (sleep_time >= std::chrono::milliseconds(0)) {
                         std::this_thread::sleep_for(sleep_time);
+                    } else {
+                        /* if we are here, that means we have got a negative sleep time
+                         * iow, we need to "advance" more in the next frame to make up for the slow frame we had previously
+                         */
+                        debt = -sleep_time;
                     }
                 }
             };
