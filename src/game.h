@@ -41,6 +41,13 @@ namespace Game {
         BreakLoop,
     };
 
+    struct Resolution {
+        int16_t width;
+        int16_t height;
+        Resolution(int16_t width, int16_t height) : width(width), height(height) {
+        }
+    };
+
     class sdl_info {
         public:
             unsigned int fps = 60; /* fps >= 0 */
@@ -49,8 +56,8 @@ namespace Game {
             std::map<std::string, SDL_Texture*> map;
             /* std::string til I manage to stop being lazy */
 
-            sdl_info(const char* game_name, int width, int height, int fps_param=60) {
-                window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_SHOWN);
+            sdl_info(const char* game_name, int fps_param=60) {
+                window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
                 if (window == NULL) { throw SDLError(); }
                 win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED );
                 if (fps_param > 0) fps = fps_param;
@@ -61,6 +68,13 @@ namespace Game {
                 }
                 SDL_DestroyWindow(window);
             }
+
+            Resolution get_current_res() {
+                SDL_DisplayMode current;
+                SDL_GetCurrentDisplayMode(0, &current); // we assume nothing goes wrong..
+                return Resolution(current.w, current.h);
+            }
+
             void load_png(std::string key, std::string path) {
                  {
                     auto it = map.find(key);

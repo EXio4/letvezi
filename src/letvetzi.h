@@ -7,16 +7,7 @@
 #include <boost/variant.hpp>
 #include "game.h"
 
-const int SCREEN_WIDTH  = 640;
-const int SCREEN_HEIGHT = 480;
-
 namespace Letvetzi {
-    struct Resolution {
-        int16_t width;
-        int16_t height;
-        Resolution(int16_t width, int16_t height) : width(width), height(height) {
-        }
-    };
     struct Velocity {
         public:
         int16_t x;
@@ -32,11 +23,11 @@ namespace Letvetzi {
         Position(int16_t x_p, int16_t y_p, Velocity vel_p) : x(x_p), y(y_p), vel(vel_p) {
         };
         Position() : x(0), y(0), vel(Velocity(0,0)) {};
-        void apply_vel(Resolution res, int16_t fps_relation) {
+        void apply_vel(Game::Resolution res, int16_t fps_relation) {
             int16_t p_x = x + (vel.x * res.width * fps_relation) /100/1000;
             int16_t p_y = y + (vel.y * res.height  * fps_relation) /100/1000;
-            x = std::max<int16_t>(-64, std::min<int16_t>(p_x, res.width-64));
-            y = std::max<int16_t>(0, std::min<int16_t>(p_y, res.height));
+            x = std::max<int16_t>(-64, std::min<int16_t>(p_x, res.width+64));
+            y = std::max<int16_t>(-64, std::min<int16_t>(p_y, res.height+64));
         }
     };
 
@@ -75,11 +66,46 @@ namespace Letvetzi {
             };
         };
 
+        enum Ret {
+            RemoveFromScreen,
+            KeepInScreen
+        };
+
+        class Bullet {
+            public:
+                Bullet() {
+                };
+                Ret out_of_screen(Position&) {
+                    return RemoveFromScreen;
+                };
+        };
+        class Enemy {
+            public:
+                Enemy() {
+                };
+                Ret out_of_screen(Position&) {
+                    return RemoveFromScreen;
+                };
+        };
+
+        class OutOfScreen {
+            Position &pos;
+            public:
+                OutOfScreen(Position& pos) : pos(pos) {}
+                Ret operator()(Bullet x) {
+                    return x.out_of_screen(pos);
+                }
+                Ret operator()(Enemy x) {
+                    return x.out_of_screen(pos);
+                }
+        };
         struct Meta {
             std::string txt_name;
             Position pos;
+            SDL_Rect rect;
+            boost::variant<Bullet, Enemy> var;
+            OutOfScreen out_of_screen = OutOfScreen(pos);
         };
-
     }
 
 
@@ -87,7 +113,7 @@ namespace Letvetzi {
 
         class Type {
             public:
-            Resolution res;
+            Game::Resolution res;
             bool quit;
             Position player;
             std::list<Particle> bg_particles;
@@ -98,7 +124,7 @@ namespace Letvetzi {
             } bg_particles_gen;
             std::map<Entity::Name,Entity::Meta> ent_mp;
             Entity::Name last_entity = Entity::Name(0);
-            Type(Resolution res_p, Position player_p, bool quit_p = false)
+            Type(Game::Resolution res_p, Position player_p, bool quit_p = false)
                : res(res_p), quit(quit_p), player(player_p) {
                 { std::random_device rd;
                   std::default_random_engine r_eg(rd());;
@@ -109,7 +135,7 @@ namespace Letvetzi {
                   bg_particles_gen.start_speed = start_speed;
                 };
                 {
-                    for (int i=0; i<70; i++) {
+                    for (int i=0; i<res.width/20; i++) {
                         add_bg_particle((i*100)%res.height);
                     }
                 };
@@ -124,9 +150,10 @@ namespace Letvetzi {
 
             void add_bullet(Velocity vel) {
                 with_new_entity([&](Entity::Name, Entity::Meta& entity) {
-                    entity.pos    = player;
+                    entity.pos      = player;
+                    entity.pos.x   += 32;
                     entity.txt_name = "player_laser";
-                    entity.pos.vel = vel;
+                    entity.pos.vel  = vel;
                 });
             }
 
@@ -196,26 +223,23 @@ namespace Letvetzi {
                 case SDL_KEYDOWN:
                         if(ev.key.repeat == 0) {
                             switch(ev.key.keysym.sym) {
-                                case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(-30,0)));
-                                                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                                                 game_events.push(Events::Type(Events::PlayerMove(-30,0)));
+                                case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(-50,0)));
                                                  break;
-                                case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(+30,0)));
-                                                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                                                 game_events.push(Events::Type(Events::PlayerMove(+30,0)));
+                                case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(+50,0)));
+
                                                  break;
                             }
                         } 
                         switch(ev.key.keysym.sym) {
-                            case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(50)));
+                            case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(150)));
                                              break;
                         }
                         break;
                 case SDL_KEYUP:
                         switch(ev.key.keysym.sym) {
-                            case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(+60,0)));
+                            case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(+50,0)));
                                              break;
-                            case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(-60,0)));
+                            case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(-50,0)));
                                              break;
                             default: break;
                         }
@@ -248,8 +272,8 @@ namespace Letvetzi {
                 SDL_SetRenderDrawColor(gs.win_renderer, 75, 0, 60, 255);
                 SDL_RenderClear(gs.win_renderer);
                 for(auto p = s.bg_particles.begin(); p != s.bg_particles.end() ;) {
-                    (*p).pos.apply_vel(s.res, fps_relation);
                     gs.with("bg_star", [&](SDL_Texture *bg_star) {
+                         (*p).pos.apply_vel(s.res, fps_relation);
                         /* this could be optimized such that we don't query the texture more than once
                          *  (per frame, or even `just once` in the whole game)
                          */
@@ -270,17 +294,28 @@ namespace Letvetzi {
                 /**/
 
                 /* draw entities on the world */
-                //auto p = s.bg_particles.begin(); p != s.bg_particles.end() ;
-                for (auto x = s.ent_mp.begin() ; x != s.ent_mp.end() ;) {
-                    (*x).second.pos.apply_vel(s.res, fps_relation);
-                    gs.with((*x).second.txt_name, [&](SDL_Texture *texture) {
+                for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
+                    gs.with(curr->second.txt_name, [&](SDL_Texture *texture) {
+                        curr->second.pos.apply_vel(s.res, fps_relation);
                         SDL_Rect r;
-                        r.x = (*x).second.pos.x;
-                        r.y = (*x).second.pos.y;
+                        r.x = curr->second.pos.x;
+                        r.y = curr->second.pos.y;
                         SDL_QueryTexture(texture, NULL, NULL, &(r.w), &(r.h));
                         SDL_RenderCopy(gs.win_renderer, texture, NULL, &r);
                     });
-                    x++;
+                    Entity::Ret e_ret = Entity::Ret::KeepInScreen;
+                    if ((curr->second.pos.x > s.res.width  || curr->second.pos.x < 0) ||
+                        (curr->second.pos.y > s.res.height || curr->second.pos.y < 0) ) {
+                            e_ret = boost::apply_visitor(curr->second.out_of_screen, curr->second.var);
+                    };
+                    switch(e_ret) {
+                        case Entity::Ret::KeepInScreen:
+                                curr++;
+                                break;
+                        case Entity::Ret::RemoveFromScreen:
+                                curr = s.ent_mp.erase(curr); 
+                                break;
+                    }
                 }
 
                 // draw player

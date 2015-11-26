@@ -17,17 +17,18 @@ int main() {
         { int imgFlags = IMG_INIT_PNG;
           if(!(IMG_Init(imgFlags) & imgFlags)) { throw Game::SDLError(IMG_GetError()); }
         }
-        Game::sdl_info gs("Letvetzi", SCREEN_WIDTH, SCREEN_HEIGHT);
+        Game::sdl_info gs("Letvetzi");
 
         gs.load_png("player"      , "art/player.png");
         gs.load_png("bg_star"     , "art/bg_star.png");
         gs.load_png("player_laser", "art/player_laser.png");
         gs.load_png("enemy_1"     , "art/enemy_1.png");
 
+        Game::Resolution res = gs.get_current_res();
         Letvetzi::GameState::Type start_state =
                    Letvetzi::GameState::Type(
-                        Letvetzi::Resolution(SCREEN_WIDTH,SCREEN_HEIGHT),
-                        Letvetzi::Position(SCREEN_WIDTH/2,SCREEN_HEIGHT-SCREEN_HEIGHT/4,
+                        res,
+                        Letvetzi::Position(res.width/2,res.height-120,
                                 Letvetzi::Velocity(0,0))
                         );
 
