@@ -229,8 +229,12 @@ namespace Letvetzi {
                         if (ent_x.var.type() == typeid(Bullet) && ent_y.var.type() == typeid(Enemy)) {
                                 ent_x.kill();
                                 ent_y.kill();
-                                gs.add_enemy();
-                                gs.maybe_add_enemy(0.05);
+                                gs.maybe_add_enemy(0.95);
+                                if (gs.ent_mp.size() <= 20) {
+                                    gs.maybe_add_enemy(0.05);
+                                } else {
+                                    gs.maybe_add_enemy(0.002);
+                                };
                                 gs.add_points(boost::get<Enemy>(ent_y.var).score);
                                 return true;
                         };
