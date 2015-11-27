@@ -69,6 +69,10 @@ namespace Letvetzi {
             };
         };
 
+        Name PlayerID() {
+            return Entity::Name(0);
+        };
+
         class Type {
             public:
                 std::string txt_name;
@@ -82,9 +86,19 @@ namespace Letvetzi {
                 virtual void out_of_screen(GameState::Type&) = 0;
         };
 
-        class Bullet : public Type {
+        class Player : public Type {
             public:
-                Bullet() {};
+                Player(Position pos_, Velocity vel_) {
+                    pos = pos_;
+                    vel = vel_;
+                    txt_name = "player";
+                };
+                void out_of_screen(GameState::Type&) {}; // impossible
+        };
+
+        class PlayerBullet : public Type {
+            public:
+                PlayerBullet() {};
                 void out_of_screen(GameState::Type&);
 
         };
@@ -97,31 +111,48 @@ namespace Letvetzi {
         };
 
         class Collision {
-        public:
+            public:
             bool operator()(GameState::Type& gs, std::shared_ptr<Type> x_sp, std::shared_ptr<Type> y_sp) {
                 Type* x = x_sp.get();
                 Type* y = y_sp.get();
                 if (auto x_ = dynamic_cast<Enemy*>(x)) {
                     if (auto y_ = dynamic_cast<Enemy*>(y)) {
                         return on_collision(gs, *x_, *y_);
-                    } else if (auto y_ = dynamic_cast<Bullet*>(y)) {
+                    } else if (auto y_ = dynamic_cast<PlayerBullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<Player*>(y)) {
                         return on_collision(gs, *x_, *y_);
                     };
-                } else if (auto x_ = dynamic_cast<Bullet*>(x)) {
+                } else if (auto x_ = dynamic_cast<PlayerBullet*>(x)) {
                     if (auto y_ = dynamic_cast<Enemy*>(y)) {
                         return on_collision(gs, *x_, *y_);
-                    } else if (auto y_ = dynamic_cast<Enemy*>(y)) {
+                    } else if (auto y_ = dynamic_cast<PlayerBullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<Player*>(y)) {
                         return on_collision(gs, *x_, *y_);
                     };
-                };
-
+                } else if (auto x_ = dynamic_cast<Player*>(x)) {
+                    if (auto y_ = dynamic_cast<Enemy*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<PlayerBullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<Player*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    };
+                }
                 return false;
             };
 
-            bool on_collision(GameState::Type&, Enemy& , Enemy& );
-            bool on_collision(GameState::Type&, Enemy& , Bullet&);
-            bool on_collision(GameState::Type&, Bullet&, Enemy& );
-            bool on_collision(GameState::Type&, Bullet&, Bullet&);
+            bool on_collision(GameState::Type&, Enemy&        , Enemy&       );
+            bool on_collision(GameState::Type&, Enemy&        , PlayerBullet&);
+            bool on_collision(GameState::Type&, Enemy&        , Player&      );
+            bool on_collision(GameState::Type&, PlayerBullet& , Enemy&       );
+            bool on_collision(GameState::Type&, PlayerBullet& , PlayerBullet&);
+            bool on_collision(GameState::Type&, PlayerBullet& , Player&      );
+            bool on_collision(GameState::Type&, Player&       , Enemy&       );
+            bool on_collision(GameState::Type&, Player&       , PlayerBullet&);
+            bool on_collision(GameState::Type&, Player&       , Player&      );
+
         } collision;
     };
 
@@ -135,8 +166,6 @@ namespace Letvetzi {
             bool game_over = false;
             Game::Resolution res;
             bool quit;
-            Position player;
-            Velocity player_vel;
             Position player_original;
             std::list<Particle> bg_particles;
             struct {
@@ -146,9 +175,9 @@ namespace Letvetzi {
                 std::uniform_real_distribution<double> enemy_type;
             } bg_particles_gen;
             std::map<Entity::Name,std::shared_ptr<Entity::Type>> ent_mp;
-            Entity::Name last_entity = Entity::Name(0);
+            Entity::Name last_entity = Entity::Name(1);
             Type(Game::Resolution res_p, Position player_p, bool quit_p = false)
-               : res(res_p), quit(quit_p), player(player_p), player_vel(Velocity(0,0)), player_original(player_p) {
+               : res(res_p), quit(quit_p), player_original(player_p) {
                 { std::random_device rd;
                   std::default_random_engine r_eg(rd());;
                   std::uniform_int_distribution<int16_t> start_pos(0, res.width); // start positions \x -> (x,0)
@@ -164,7 +193,7 @@ namespace Letvetzi {
                         add_bg_particle((i*100)%res.height);
                     };
 
-                    restart_game();
+                    restart_game(true);
                 };
 
             };
@@ -211,22 +240,23 @@ namespace Letvetzi {
             void add_bullet(Velocity vel) {
                 if (game_over) return restart_game();
                 with_new_entity([&](Entity::Name) {
-                    Entity::Bullet *entity = new Entity::Bullet();
-                    entity->pos        = player;
+                    Entity::PlayerBullet *entity = new Entity::PlayerBullet();
+                    entity->pos        = ent_mp[Entity::PlayerID()]->pos;
                     entity->pos.x     += 46;
                     entity->txt_name   = "player_laser";
                     entity->vel        = vel;
                     return entity;
                 });
             }
-            void restart_game() {
-                player = player_original;
+            void restart_game(bool first=false) {
+                Velocity vel = Velocity(0,0);
+                if (!first) vel = ent_mp[Entity::PlayerID()]->vel;
                 points = 0;
                 lives  = 10;
                 game_over = false;
                 ent_mp.clear();
-                last_entity = Entity::Name(0);
-
+                last_entity = Entity::Name(1);
+                ent_mp[Entity::PlayerID()] = std::shared_ptr<Entity::Type>(new Entity::Player(player_original, vel));
                 for (int i=0; i<5; i++) {
                     add_enemy();
                 };
@@ -244,10 +274,10 @@ namespace Letvetzi {
     }
 
     namespace Entity {
-        bool Collision::on_collision(GameState::Type& gs, Enemy& e, Bullet& b) {
+        bool Collision::on_collision(GameState::Type& gs, Enemy& e, PlayerBullet& b) {
                     return Collision::on_collision(gs, b, e);
         };
-        bool Collision::on_collision(GameState::Type& gs, Bullet& b, Enemy& e) {
+        bool Collision::on_collision(GameState::Type& gs, PlayerBullet& b, Enemy& e) {
             b.kill();
             e.kill();
             gs.add_enemy();
@@ -255,13 +285,29 @@ namespace Letvetzi {
             gs.add_points(e.score);
             return true;
         };
-        bool Collision::on_collision(GameState::Type&, Bullet&, Bullet&) {
+        bool Collision::on_collision(GameState::Type& gs, Player&, Enemy&) {
+            gs.game_over = true;
+            return true;
+        };
+        bool Collision::on_collision(GameState::Type& gs, Enemy& e, Player& p) {
+            return on_collision(gs, p, e);
+        };
+        bool Collision::on_collision(GameState::Type&, PlayerBullet&, Player&) {
+            return false;
+        };
+        bool Collision::on_collision(GameState::Type&, Player&, PlayerBullet&) {
+            return false;
+        };
+        bool Collision::on_collision(GameState::Type&, PlayerBullet&, PlayerBullet&) {
             return false;
         };
         bool Collision::on_collision(GameState::Type&, Enemy&, Enemy&) {
             return false;
         };
-        void Bullet::out_of_screen(GameState::Type&) {
+        bool Collision::on_collision(GameState::Type&, Player&, Player&) {
+            return false;
+        };
+        void PlayerBullet::out_of_screen(GameState::Type&) {
             this->kill();
         };
         void Enemy::out_of_screen(GameState::Type& gs) {
@@ -302,7 +348,7 @@ namespace Letvetzi {
                 s.add_bullet(ev.vel);
             };
             void operator()(PlayerMove ev) const {
-                s.player_vel = s.player_vel + ev.vel;
+                s.ent_mp[Entity::PlayerID()]->vel =s.ent_mp[Entity::PlayerID()]->vel + ev.vel;
             };
             void operator()(QuitGame) const {
                 s.quit = true;
@@ -381,7 +427,7 @@ namespace Letvetzi {
                                 Conc::VarL<GameState::Type>& svar,
                                 uint16_t                     fps_relation) {
             return svar.modify([&](GameState::Type& s) {
-                if (!s.game_over) apply_velocity(s.player, s.player_vel, s.res, fps_relation);
+                std::shared_ptr<Entity::Type> player_pointer = s.ent_mp[Entity::PlayerID()];
                 // apply background
                 SDL_SetRenderDrawColor(gs.win_renderer, 75, 0, 60, 255);
                 SDL_RenderClear(gs.win_renderer);
@@ -463,8 +509,8 @@ namespace Letvetzi {
                     // draw player
                     gs.with("player", [&](Game::TextureInfo player) {
                         SDL_Rect r;
-                        r.x = s.player.x;
-                        r.y = s.player.y;
+                        r.x = player_pointer->pos.x;
+                        r.y = player_pointer->pos.y;
                         r.w = player.width;
                         r.h = player.height;
                         SDL_RenderCopy(gs.win_renderer, player.texture, NULL, &r);
