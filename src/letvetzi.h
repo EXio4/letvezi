@@ -5,29 +5,29 @@
 #include <random>
 #include <algorithm>
 #include <boost/variant.hpp>
+#include "vect.h"
 #include "game.h"
 
 namespace Letvetzi {
     struct Velocity {
         public:
-        int16_t x;
-        int16_t y;
-        Velocity(int16_t x_p, int16_t y_p) : x(x_p), y(y_p) {
+            Vec<int16_t> vec;
+        Velocity(int16_t x_p, int16_t y_p) : vec(Vec<int16_t>(x_p,y_p)) {
         };
     };
     struct Position {
         public:
-        int16_t x;
-        int16_t y;
-        Velocity vel;
-        Position(int16_t x_p, int16_t y_p, Velocity vel_p) : x(x_p), y(y_p), vel(vel_p) {
-        };
-        Position() : x(0), y(0), vel(Velocity(0,0)) {};
+            Vec<int16_t> pos;
+            Velocity vel;
+
+        Position(Vec<int16_t> pos, Velocity vel) : pos(pos), vel(vel) {};
+        Position() : pos(Vec<int16_t>(0,0)), vel(Velocity(0,0)) {};
+
         void apply_vel(Game::Resolution res, int16_t fps_relation) {
-            int16_t p_x = x + (vel.x * res.width * fps_relation) /100/1000;
-            int16_t p_y = y + (vel.y * res.height  * fps_relation) /100/1000;
-            x = std::max<int16_t>(-64, std::min<int16_t>(p_x, res.width+64));
-            y = std::max<int16_t>(-64, std::min<int16_t>(p_y, res.height+64));
+            int16_t p_x = pos.x + (vel.vec.x * res.width  * fps_relation) /100/1000;
+            int16_t p_y = pos.y + (vel.vec.y * res.height * fps_relation) /100/1000;
+            pos.x = std::max<int16_t>(-64, std::min<int16_t>(p_x, res.width+64));
+            pos.y = std::max<int16_t>(-64, std::min<int16_t>(p_y, res.height+64));
         } 
     };
 
@@ -70,6 +70,11 @@ namespace Letvetzi {
             bool operator> (const Name& other) const {
                 return entity_id >  other.entity_id;
             };
+        };
+
+        class Type {
+            public:
+                virtual void out_of_screen(GameState::Type&, Type&);
         };
 
         class Bullet {
@@ -159,7 +164,7 @@ namespace Letvetzi {
                 int16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
                 int16_t speed = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
                 int16_t ysped = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
-                bg_particles.push_front(Particle("bg_star", Position(x,start_y,Velocity(ysped-70, speed))));
+                bg_particles.push_front(Particle("bg_star", Position(Vec<int16_t>(x,start_y),Velocity(ysped-70, speed))));
             };
 
             void add_enemy() {
@@ -168,15 +173,15 @@ namespace Letvetzi {
                     double  type  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
                     // we reuse the random number generator of the bg_particles, TODO: rename it
                     if (type > 0.9) {
-                        entity.pos = Position(x, 2, Velocity(0,55));
+                        entity.pos = Position(Vec<int16_t>(x, 2), Velocity(0,55));
                         entity.txt_name = "enemy_3";
                        entity.var = Entity::Enemy(300);
                     } else if (type > 0.4) {
-                        entity.pos = Position(x, 2, Velocity(0,45));
+                        entity.pos = Position(Vec<int16_t>(x, 2), Velocity(0,45));
                         entity.txt_name = "enemy_2";
                         entity.var = Entity::Enemy(200);
                     } else {
-                        entity.pos = Position(x, 5, Velocity(0,35));
+                        entity.pos = Position(Vec<int16_t>(x, 5), Velocity(0,35));
                         entity.txt_name = "enemy_1";
                         entity.var = Entity::Enemy(100);
                     }
@@ -190,11 +195,11 @@ namespace Letvetzi {
             void add_bullet(Velocity vel) {
                 if (game_over) return restart_game();
                 with_new_entity([&](Entity::Name, Entity::Meta& entity) {
-                    entity.pos      = player;
-                    entity.pos.x   += 46;
-                    entity.txt_name = "player_laser";
-                    entity.pos.vel  = vel;
-                    entity.var = Entity::Bullet();
+                    entity.pos        = player;
+                    entity.pos.pos.x += 46;
+                    entity.txt_name   = "player_laser";
+                    entity.pos.vel    = vel;
+                    entity.var        = Entity::Bullet();
                 });
             }
             void restart_game() {
@@ -284,8 +289,7 @@ namespace Letvetzi {
                 s.add_bullet(ev.vel);
             };
             void operator()(PlayerMove ev) const {
-                s.player.vel.x += ev.vel.x;
-                s.player.vel.y += ev.vel.y;
+                s.player.vel.vec = s.player.vel.vec + ev.vel.vec;
             };
             void operator()(QuitGame) const {
                 s.quit = true;
@@ -308,6 +312,7 @@ namespace Letvetzi {
             switch(ev.type) {
                 case SDL_QUIT:
                          game_events.push(Events::Type(Events::QuitGame()));
+                         return; // we have no more things to do
                          break;
                 case SDL_KEYDOWN:
                         if(ev.key.repeat == 0) {
@@ -345,6 +350,7 @@ namespace Letvetzi {
             Events::Type ev = game_events.pop();
             svar.modify([&](GameState::Type& s) {
                 boost::apply_visitor(Events::ApplyEvent(s), ev.data);
+                if (s.quit) return;
             });
         };
     };
@@ -373,15 +379,15 @@ namespace Letvetzi {
                          *  (per frame, or even `just once` in the whole game)
                          */
                         SDL_Rect r;
-                        r.x = p->pos.x;
-                        r.y = p->pos.y;
+                        r.x = p->pos.pos.x;
+                        r.y = p->pos.pos.y;
                         r.w = bg_star.width;
                         r.h = bg_star.height;
                         SDL_RenderCopyEx(gs.win_renderer, bg_star.texture, NULL, &r, p->angle, NULL, SDL_FLIP_NONE);
                         p->angle += fps_relation/2;
                     });
 
-                    if (p->pos.y >= s.res.height || p->pos.x <= 0 || p->pos.x >= s.res.width) {
+                    if (p->pos.pos.y >= s.res.height || p->pos.pos.x <= 0 || p->pos.pos.x >= s.res.width) {
                         p = s.bg_particles.erase(p);
                         s.add_bg_particle();
                     } else {
@@ -404,14 +410,14 @@ namespace Letvetzi {
                         gs.with(curr.second.txt_name, [&](Game::TextureInfo text) {
                             curr.second.pos.apply_vel(s.res, fps_relation);
                             SDL_Rect curr_rect;
-                            curr_rect.x = curr.second.pos.x;
-                            curr_rect.y = curr.second.pos.y;
+                            curr_rect.x = curr.second.pos.pos.x;
+                            curr_rect.y = curr.second.pos.pos.y;
                             curr_rect.w = text.width;
                             curr_rect.h = text.height;
                             SDL_RenderCopy(gs.win_renderer, text.texture, NULL, &curr_rect);
 
-                            if ((curr.second.pos.x > s.res.width  || curr.second.pos.x < 0) ||
-                                (curr.second.pos.y > s.res.height || curr.second.pos.y < 0) ) {
+                            if ((curr.second.pos.pos.x > s.res.width  || curr.second.pos.pos.x < 0) ||
+                                (curr.second.pos.pos.y > s.res.height || curr.second.pos.pos.y < 0) ) {
                                     boost::apply_visitor(Entity::OutOfScreen(s,curr.second), curr.second.var);
                             };
                         });
@@ -421,16 +427,16 @@ namespace Letvetzi {
                     for (auto& curr : s.ent_mp) {
                         gs.with(curr.second.txt_name, [&](Game::TextureInfo text) {
                             SDL_Rect curr_rect;
-                            curr_rect.x = curr.second.pos.x;
-                            curr_rect.y = curr.second.pos.y;
+                            curr_rect.x = curr.second.pos.pos.x;
+                            curr_rect.y = curr.second.pos.pos.y;
                             curr_rect.w = text.width;
                             curr_rect.h = text.height;
                             for (auto& other : s.ent_mp) {
                                 if (other.first <= curr.first) continue; // we ignore ourselves
                                 gs.with(other.second.txt_name, [&](Game::TextureInfo text2) {
                                     SDL_Rect other_rect;
-                                    other_rect.x = other.second.pos.x;
-                                    other_rect.y = other.second.pos.y;
+                                    other_rect.x = other.second.pos.pos.x;
+                                    other_rect.y = other.second.pos.pos.y;
                                     other_rect.w = text2.width;
                                     other_rect.h = text2.height;
                                     if (collide(&curr_rect, &other_rect)) {
@@ -443,8 +449,8 @@ namespace Letvetzi {
                     // draw player
                     gs.with("player", [&](Game::TextureInfo player) {
                         SDL_Rect r;
-                        r.x = s.player.x;
-                        r.y = s.player.y;
+                        r.x = s.player.pos.x;
+                        r.y = s.player.pos.y;
                         r.w = player.width;
                         r.h = player.height;
                         SDL_RenderCopy(gs.win_renderer, player.texture, NULL, &r);

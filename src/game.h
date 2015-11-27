@@ -27,12 +27,6 @@ namespace Game {
             { info = SDL_GetError(); }
 
         virtual const char* what() const throw() {
-            /*std::ostringstream cnvt;
-
-            cnvt.str("SDL Error: ");
-
-            cnvt << info; */
-
             return info.c_str();
         }
     };
@@ -122,7 +116,7 @@ namespace Game {
                 /* we use .at as if it didn't exist, we already threw a nice error message */
                 return fn(surf);
             }
-            const std::map<std::string,TextureInfo> textures() {
+            const std::map<std::string,TextureInfo>& textures() {
                 return txts;
             }
 
@@ -153,7 +147,7 @@ namespace Game {
                 std::thread gevs_th(gs_handler , std::ref(game_events), std::ref(game_state));
 
                 ev_th.detach();
-                gevs_th.detach(); 
+                gevs_th.detach();
                 uint16_t fps_relation = 1000/fps;
 
                 auto debt = std::chrono::milliseconds(0);
@@ -185,7 +179,8 @@ namespace Game {
                          */
                         debt = -sleep_time;
                     }
-                }
+                };
+
             };
     };
 }
