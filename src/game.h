@@ -2,6 +2,7 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 #include <map>
 #include <thread>
 #include <mutex>
@@ -62,12 +63,14 @@ namespace Game {
         public:
             SDL_Window*   window        = NULL;
             SDL_Renderer* win_renderer  = NULL;
+            TTF_Font*     font          = NULL;
 
-            sdl_info(const char* game_name, int fps_param=60) {
+            sdl_info(const char* game_name, std::string font_name, int fps_param=60) {
                 window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
                 if (window == NULL) { throw SDLError(); }
                 win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED );
                 if (fps_param > 0) fps = fps_param;
+                font = TTF_OpenFont(font_name.c_str(), 24);
             }
             ~sdl_info() {
                 for (const auto &pair : txts) {
@@ -95,6 +98,20 @@ namespace Game {
                  SDL_QueryTexture(texture, NULL, NULL, &(inf.width), &(inf.height));
                  inf.texture = texture;
             }
+
+            void render_text(int x, int y, SDL_Color txt_color, std::string text) {
+                SDL_Rect  pos;
+                SDL_Surface* textSurface = TTF_RenderUTF8_Solid(font, text.c_str(), txt_color);
+                SDL_Texture* textTexture = SDL_CreateTextureFromSurface(win_renderer, textSurface);
+                pos.h = textSurface->h;
+                pos.w = textSurface->w;
+                pos.x = x;
+                pos.y = y;
+                SDL_FreeSurface(textSurface);
+                SDL_SetTextureBlendMode(textTexture, SDL_BLENDMODE_BLEND);
+                SDL_RenderCopy(win_renderer, textTexture, NULL, &pos);
+                SDL_DestroyTexture(textTexture);
+            };
 
             template <typename F>
             auto with(std::string key, F&& fn) {
