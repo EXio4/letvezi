@@ -33,7 +33,7 @@ int main() {
         Game::Resolution res = gs.get_current_res();
         Letvetzi::GameState::Type start_state =
                    Letvetzi::GameState::Type(res,
-                            Letvetzi::Position(Vec<int16_t>(res.width/2,res.height-70-gs.textures().at("player").height),
+                            Letvetzi::Position(Vec<Letvetzi::PositionT>(res.width/2,res.height-70-gs.textures().at("player").height),
                             Letvetzi::Velocity(0,0))
                         );
 

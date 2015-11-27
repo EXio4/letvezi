@@ -9,23 +9,25 @@
 #include "game.h"
 
 namespace Letvetzi {
-    struct Velocity {
-        public:
-            Vec<int16_t> vec;
-        Velocity(int16_t x_p, int16_t y_p) : vec(Vec<int16_t>(x_p,y_p)) {
-        };
+    struct VelocityT {
+        typedef int16_t scalar;
+    };
+    typedef Vec<VelocityT> Velocity;
+
+    struct PositionT {
+        typedef int16_t scalar;
     };
     struct Position {
         public:
-            Vec<int16_t> pos;
+            Vec<PositionT> pos;
             Velocity vel;
 
-        Position(Vec<int16_t> pos, Velocity vel) : pos(pos), vel(vel) {};
-        Position() : pos(Vec<int16_t>(0,0)), vel(Velocity(0,0)) {};
+        Position(Vec<PositionT> pos, Velocity vel) : pos(pos), vel(vel) {};
+        Position() : pos(Vec<PositionT>(0,0)), vel(Velocity(0,0)) {};
 
         void apply_vel(Game::Resolution res, int16_t fps_relation) {
-            int16_t p_x = pos.x + (vel.vec.x * res.width  * fps_relation) /100/1000;
-            int16_t p_y = pos.y + (vel.vec.y * res.height * fps_relation) /100/1000;
+            int16_t p_x = pos.x + (vel.x * res.width  * fps_relation) /100/1000;
+            int16_t p_y = pos.y + (vel.y * res.height * fps_relation) /100/1000;
             pos.x = std::max<int16_t>(-64, std::min<int16_t>(p_x, res.width+64));
             pos.y = std::max<int16_t>(-64, std::min<int16_t>(p_y, res.height+64));
         } 
@@ -164,7 +166,7 @@ namespace Letvetzi {
                 int16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
                 int16_t speed = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
                 int16_t ysped = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
-                bg_particles.push_front(Particle("bg_star", Position(Vec<int16_t>(x,start_y),Velocity(ysped-70, speed))));
+                bg_particles.push_front(Particle("bg_star", Position(Vec<PositionT>(x,start_y),Velocity(ysped-70, speed))));
             };
 
             void add_enemy() {
@@ -173,15 +175,15 @@ namespace Letvetzi {
                     double  type  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
                     // we reuse the random number generator of the bg_particles, TODO: rename it
                     if (type > 0.9) {
-                        entity.pos = Position(Vec<int16_t>(x, 2), Velocity(0,55));
+                        entity.pos = Position(Vec<PositionT>(x, 2), Velocity(0,55));
                         entity.txt_name = "enemy_3";
                        entity.var = Entity::Enemy(300);
                     } else if (type > 0.4) {
-                        entity.pos = Position(Vec<int16_t>(x, 2), Velocity(0,45));
+                        entity.pos = Position(Vec<PositionT>(x, 2), Velocity(0,45));
                         entity.txt_name = "enemy_2";
                         entity.var = Entity::Enemy(200);
                     } else {
-                        entity.pos = Position(Vec<int16_t>(x, 5), Velocity(0,35));
+                        entity.pos = Position(Vec<PositionT>(x, 5), Velocity(0,35));
                         entity.txt_name = "enemy_1";
                         entity.var = Entity::Enemy(100);
                     }
@@ -289,7 +291,7 @@ namespace Letvetzi {
                 s.add_bullet(ev.vel);
             };
             void operator()(PlayerMove ev) const {
-                s.player.vel.vec = s.player.vel.vec + ev.vel.vec;
+                s.player.vel = s.player.vel + ev.vel;
             };
             void operator()(QuitGame) const {
                 s.quit = true;

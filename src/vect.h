@@ -1,23 +1,23 @@
 #pragma once
 
-template <typename Sca>
+template <typename T>
 struct Vec {
-    Sca x;
-    Sca y;
-    Vec(Sca x, Sca y) : x(x), y(y) {};
+    typename T::scalar x;
+    typename T::scalar y;
+    Vec(typename T::scalar x, typename T::scalar y) : x(x), y(y) {};
 };
 
-template <typename Sca>
-Vec<Sca> operator+(Vec<Sca> a, Vec<Sca> b) {
-    return Vec<Sca>(a.x + b.x, a.y + b.y);
+template <typename T>
+Vec<T> operator+(Vec<T> a, Vec<T> b) {
+    return Vec<T>(a.x + b.x, a.y + b.y);
 };
 
-template <typename Sca>
-Vec<Sca> operator-(Vec<Sca> a, Vec<Sca> b) {
-    return Vec<Sca>(a.x - b.x, a.y - b.y);
+template <typename T>
+Vec<T> operator-(Vec<T> a, Vec<T> b) {
+    return Vec<T>(a.x - b.x, a.y - b.y);
 };
 
-template <typename Sca>
-Vec<Sca> operator*(Sca a, Vec<Sca> b) {
-    return Vec<Sca>(a * b.x, a * b.y);
+template <typename T>
+Vec<T> operator*(typename T::scalar a, Vec<T> b) {
+    return Vec<T>(a * b.x, a * b.y);
 };
