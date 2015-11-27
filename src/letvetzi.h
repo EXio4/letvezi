@@ -34,6 +34,7 @@ namespace Letvetzi {
     struct Particle {
         std::string txt_name;
         Position pos;
+        double angle = 0;
         Particle(std::string txt_name_p, Position pos_p) : txt_name(txt_name_p), pos(pos_p) {
         };
     };
@@ -197,7 +198,9 @@ namespace Letvetzi {
                 });
             }
             void restart_game() {
+                Velocity x = player.vel;
                 player = player_original;
+                player.vel = x;
                 points = 0;
                 lives  = 10;
                 game_over = false;
@@ -227,7 +230,7 @@ namespace Letvetzi {
                                 ent_x.kill();
                                 ent_y.kill();
                                 gs.add_enemy();
-                                gs.maybe_add_enemy(0.30);
+                                gs.maybe_add_enemy(0.05);
                                 gs.add_points(boost::get<Enemy>(ent_y.var).score);
                                 return true;
                         };
@@ -242,7 +245,7 @@ namespace Letvetzi {
         void Enemy::out_of_screen(GameState::Type& gs, Meta& ent) const {
             ent.kill();
             gs.add_enemy();
-            gs.maybe_add_enemy(0.10); // 10% extra chance of "more enemies"
+            gs.maybe_add_enemy(0.02);
             gs.lives--;
             if (gs.lives == 0) gs.game_over = true;
         };
@@ -311,7 +314,7 @@ namespace Letvetzi {
 
                                                  break;
                             }
-                        } 
+                        }
                         switch(ev.key.keysym.sym) {
                             case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(200)));
                                              break;
@@ -322,6 +325,8 @@ namespace Letvetzi {
                             case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(+speed,0)));
                                              break;
                             case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(-speed,0)));
+                                             break;
+                            case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(200)));
                                              break;
                             default: break;
                         }
@@ -368,7 +373,8 @@ namespace Letvetzi {
                         r.y = p->pos.y;
                         r.w = bg_star.width;
                         r.h = bg_star.height;
-                        SDL_RenderCopy(gs.win_renderer, bg_star.texture, NULL, &r);
+                        SDL_RenderCopyEx(gs.win_renderer, bg_star.texture, NULL, &r, p->angle, NULL, SDL_FLIP_NONE);
+                        p->angle += fps_relation/2;
                     });
 
                     if (p->pos.y >= s.res.height || p->pos.x <= 0 || p->pos.x >= s.res.width) {
@@ -453,7 +459,7 @@ namespace Letvetzi {
                     SDL_RenderFillRect(gs.win_renderer, &rect);
                 };
                 SDL_Color txt_color = {200, 200, 200, 255}; // hud color
-                gs.render_text(s.res.width - 256, s.res.height - 48, txt_color, "Points: " + std::to_string(s.points));
+                gs.render_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
                 gs.render_text(48, s.res.height - 48, txt_color, "Lives: ");
                 gs.with("player_life", [&](Game::TextureInfo txt) {
                     SDL_Rect pos;
