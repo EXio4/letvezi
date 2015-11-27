@@ -96,7 +96,8 @@ namespace Game {
                  inf.texture = texture;
             }
 
-            void with(std::string key, std::function<void(TextureInfo)> fn) {
+            template <typename F>
+            auto with(std::string key, F&& fn) {
                 auto it = txts.find(key);
                 if (it == txts.end()) { throw SDLError("[KEY] image not found"); }
                 auto surf = it->second;

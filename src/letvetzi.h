@@ -75,27 +75,26 @@ namespace Letvetzi {
             public:
                 Bullet() {
                 };
-                void out_of_screen(GameState::Type&, Meta&, Position&);
+                void out_of_screen(GameState::Type&, Meta&) const;
 
         };
         class Enemy {
             public:
                 Enemy() {
                 };
-                void out_of_screen(GameState::Type&, Meta&, Position&);
+                void out_of_screen(GameState::Type&, Meta&) const;
         };
 
         class OutOfScreen {
             Meta&     ent;
-            Position& pos;
-            GameState:Type& gs;
+            GameState::Type& gs;
             public:
-                OutOfScreen(GameState::Type& gs, Meta& ent, Position& pos) : ent(ent), pos(pos), gs(gs) {}
-                void operator()(Bullet x) {
-                    x.out_of_screen(gs, ent, pos);
+                OutOfScreen(GameState::Type& gs, Meta& ent) : ent(ent), gs(gs) {}
+                void operator()(Bullet& x) const {
+                    x.out_of_screen(gs, ent);
                 }
-                void operator()(Enemy x) {
-                    x.out_of_screen(gs, ent, pos);
+                void operator()(Enemy& x) const {
+                    x.out_of_screen(gs, ent);
                 }
         };
 
@@ -105,8 +104,6 @@ namespace Letvetzi {
             Position pos;
             SDL_Rect rect;
             boost::variant<Bullet, Enemy> var;
-            OutOfScreen out_of_screen/* = OutOfScreen(gs, *this, pos)*/;
-            Meta(GameState::Type& gs) : out_of_screen(OutOfScreen(gs, *this, pos)) { };
             void kill() {
                 killed = true;
             };
@@ -163,6 +160,7 @@ namespace Letvetzi {
                     // we reuse the random number generator of the bg_particles, TODO: rename it
                     entity.pos = Position(x, 15, Velocity(0,50));
                     entity.txt_name = "enemy_1";
+                    entity.var = Entity::Enemy();
                 });
             };
 
@@ -172,31 +170,39 @@ namespace Letvetzi {
                     entity.pos.x   += 32;
                     entity.txt_name = "player_laser";
                     entity.pos.vel  = vel;
+                    entity.var = Entity::Bullet();
                 });
             }
 
             void with_new_entity(std::function<void(Entity::Name,Entity::Meta&)> fn) {
                  Entity::Name e = last_entity;
                  ++last_entity;
-                 return fn(e,ent_mp[e]);
+                 if (ent_mp.size() > 100) {
+                     printf("Too many entities on screen, not allowing more for a bit\n");
+                     return;
+                }
+                 ent_mp.insert(std::pair<Entity::Name, Entity::Meta>(e, Entity::Meta()));
+                 return fn(e,ent_mp.at(e));
             }
         };
     }
 
     namespace Entity {
-        void on_collision(GameState::Type& gs, Meta& ent_x, Meta& ent_y) {
+        bool on_collision(GameState::Type& gs, Meta& ent_x, Meta& ent_y) {
                         if ((ent_x.var.type() == typeid(Bullet) && ent_y.var.type() == typeid(Enemy) ) ||
                             (ent_x.var.type() == typeid(Enemy)  && ent_y.var.type() == typeid(Bullet)) ) {
                                 ent_x.kill();
                                 ent_y.kill();
                                 gs.add_enemy();
+                                return true;
 //                        gs.add_points(100);
                         };
+                        return false;
         };
-        void Bullet::out_of_screen(GameState::Type&, Meta& ent, Position&) {
+        void Bullet::out_of_screen(GameState::Type&, Meta& ent) const{
             ent.kill();
         };
-        void Enemy::out_of_screen(GameState::Type& gs, Meta& ent, Position&) {
+        void Enemy::out_of_screen(GameState::Type& gs, Meta& ent) const {
             ent.kill();
             gs.add_enemy();
         };
@@ -258,9 +264,9 @@ namespace Letvetzi {
                 case SDL_KEYDOWN:
                         if(ev.key.repeat == 0) {
                             switch(ev.key.keysym.sym) {
-                                case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(-50,0)));
+                                case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(-80,0)));
                                                   break;
-                                case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(+50,0)));
+                                case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(+80,0)));
 
                                                  break;
                             }
@@ -272,9 +278,9 @@ namespace Letvetzi {
                         break;
                 case SDL_KEYUP:
                         switch(ev.key.keysym.sym) {
-                            case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(+50,0)));
+                            case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(+80,0)));
                                              break;
-                            case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(-50,0)));
+                            case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(-80,0)));
                                              break;
                             default: break;
                         }
@@ -302,7 +308,7 @@ namespace Letvetzi {
             return (SDL_HasIntersection(r1,r2) == SDL_TRUE);
         };
 
-        Game::LSit handler(Game::sdl_info&              gs,
+        Game::LSit handler(Game::sdl_info&                   gs,
                                 Conc::VarL<GameState::Type>& svar,
                                 uint16_t                     fps_relation) {
             return svar.modify([&](GameState::Type& s) {
@@ -335,23 +341,40 @@ namespace Letvetzi {
 
                 /* draw entities on the world */
                 for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
-                    gs.with(curr->second.txt_name, [&](Game::TextureInfo text) {
-                        curr->second.pos.apply_vel(s.res, fps_relation);
+                    if (curr->second.killed) {
+                        curr = s.ent_mp.erase(curr);
+                    } else {
+                        curr++;
+                    };
+                };
+
+                for (auto& curr : s.ent_mp) {
+                    gs.with(curr.second.txt_name, [&](Game::TextureInfo text) {
+                        curr.second.pos.apply_vel(s.res, fps_relation);
                         SDL_Rect curr_rect;
-                        curr_rect.x = curr->second.pos.x;
-                        curr_rect.y = curr->second.pos.y;
+                        curr_rect.x = curr.second.pos.x;
+                        curr_rect.y = curr.second.pos.y;
                         curr_rect.w = text.width;
                         curr_rect.h = text.height;
                         SDL_RenderCopy(gs.win_renderer, text.texture, NULL, &curr_rect);
 
-                        if ((curr->second.pos.x > s.res.width  || curr->second.pos.x < 0) ||
-                            (curr->second.pos.y > s.res.height || curr->second.pos.y < 0) ) {
-                                boost::apply_visitor(curr->second.out_of_screen, curr->second.var);
+                        if ((curr.second.pos.x > s.res.width  || curr.second.pos.x < 0) ||
+                            (curr.second.pos.y > s.res.height || curr.second.pos.y < 0) ) {
+                                boost::apply_visitor(Entity::OutOfScreen(s,curr.second), curr.second.var);
                         };
+                    });
+                }
 
-                        // collision detection
+                // collision detection
+                for (auto& curr : s.ent_mp) {
+                    gs.with(curr.second.txt_name, [&](Game::TextureInfo text) {
+                        SDL_Rect curr_rect;
+                        curr_rect.x = curr.second.pos.x;
+                        curr_rect.y = curr.second.pos.y;
+                        curr_rect.w = text.width;
+                        curr_rect.h = text.height;
                         for (auto& other : s.ent_mp) {
-                            if (other.first == curr->first) continue; // we ignore ourselves
+                            if (other.first <= curr.first) continue; // we ignore ourselves
                             gs.with(other.second.txt_name, [&](Game::TextureInfo text2) {
                                 SDL_Rect other_rect;
                                 other_rect.x = other.second.pos.x;
@@ -359,17 +382,12 @@ namespace Letvetzi {
                                 other_rect.w = text2.width;
                                 other_rect.h = text2.height;
                                 if (collide(&curr_rect, &other_rect)) {
-                                    Entity::on_collision(s, curr->second, other.second);
+                                    Entity::on_collision(s, curr.second, other.second);
                                 };
                             });
                         };
                     });
-                    if (curr->second.killed) {
-                        curr = s.ent_mp.erase(curr);
-                    } else {
-                        curr++;
-                    };
-                }
+                };
 
                 // draw player
                 gs.with("player", [&](Game::TextureInfo player) {
