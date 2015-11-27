@@ -110,7 +110,7 @@ namespace Game {
             template <typename F>
             auto with(std::string key, F&& fn) {
                 auto it = txts.find(key);
-                if (it == txts.end()) { throw SDLError("[KEY] image not found"); }
+                if (it == txts.end()) { throw SDLError("[KEY] image not found: " + key); }
                 auto surf = it->second;
 
                 /* we use .at as if it didn't exist, we already threw a nice error message */

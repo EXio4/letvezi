@@ -4,6 +4,7 @@
 #include <list>
 #include <random>
 #include <algorithm>
+#include <memory>
 #include <boost/variant.hpp>
 #include "vect.h"
 #include "game.h"
@@ -40,7 +41,7 @@ namespace Letvetzi {
     };
 
     namespace Entity {
-        struct Meta;
+        class Type;
         struct Name {
             uint16_t entity_id;
             Name(uint16_t e) : entity_id(e) {};
@@ -70,50 +71,58 @@ namespace Letvetzi {
 
         class Type {
             public:
-                virtual void out_of_screen(GameState::Type&, Type&);
-        };
-
-        class Bullet {
-            public:
-                Bullet() {
+                std::string txt_name;
+                bool killed = false;
+                Position pos = Position(0,0);
+                Velocity vel = Velocity(0,0);
+                SDL_Rect rect;
+                void kill() {
+                    killed = true;
                 };
-                void out_of_screen(GameState::Type&, Meta&) const;
+                virtual void out_of_screen(GameState::Type&) = 0;
+        };
+
+        class Bullet : public Type {
+            public:
+                Bullet() {};
+                void out_of_screen(GameState::Type&);
 
         };
-        class Enemy {
+        class Enemy : public Type {
             public:
                 int score = 100;
                 Enemy(int score) : score(score) {};
-                Enemy() {
+                Enemy() {};
+                void out_of_screen(GameState::Type&);
+        };
+
+        class Collision {
+        public:
+            bool operator()(GameState::Type& gs, std::shared_ptr<Type> x_sp, std::shared_ptr<Type> y_sp) {
+                Type* x = x_sp.get();
+                Type* y = y_sp.get();
+                if (auto x_ = dynamic_cast<Enemy*>(x)) {
+                    if (auto y_ = dynamic_cast<Enemy*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<Bullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    };
+                } else if (auto x_ = dynamic_cast<Bullet*>(x)) {
+                    if (auto y_ = dynamic_cast<Enemy*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<Enemy*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    };
                 };
-                void out_of_screen(GameState::Type&, Meta&) const;
-        };
 
-        class OutOfScreen {
-            Meta&     ent;
-            GameState::Type& gs;
-            public:
-                OutOfScreen(GameState::Type& gs, Meta& ent) : ent(ent), gs(gs) {}
-                void operator()(Bullet& x) const {
-                    x.out_of_screen(gs, ent);
-                }
-                void operator()(Enemy& x) const {
-                    x.out_of_screen(gs, ent);
-                }
-        };
-
-        struct Meta {
-            std::string txt_name;
-            bool killed = false;
-            Position pos = Position(0,0);
-            Velocity vel = Velocity(0,0);
-            SDL_Rect rect;
-            boost::variant<Bullet, Enemy> var;
-//            Meta(Position pos, Velocity vel) : pos(pos), vel(vel) {};
-            void kill() {
-                killed = true;
+                return false;
             };
-        };
+
+            bool on_collision(GameState::Type&, Enemy& , Enemy& );
+            bool on_collision(GameState::Type&, Enemy& , Bullet&);
+            bool on_collision(GameState::Type&, Bullet&, Enemy& );
+            bool on_collision(GameState::Type&, Bullet&, Bullet&);
+        } collision;
     };
 
 
@@ -136,7 +145,7 @@ namespace Letvetzi {
                 std::uniform_int_distribution<int16_t> start_speed;
                 std::uniform_real_distribution<double> enemy_type;
             } bg_particles_gen;
-            std::map<Entity::Name,Entity::Meta> ent_mp;
+            std::map<Entity::Name,std::shared_ptr<Entity::Type>> ent_mp;
             Entity::Name last_entity = Entity::Name(0);
             Type(Game::Resolution res_p, Position player_p, bool quit_p = false)
                : res(res_p), quit(quit_p), player(player_p), player_vel(Velocity(0,0)), player_original(player_p) {
@@ -168,26 +177,30 @@ namespace Letvetzi {
             };
 
             void add_enemy() {
-                with_new_entity([&](Entity::Name, Entity::Meta& entity) {
+                with_new_entity([&](Entity::Name) {
                     int16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
                     double  type  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
                     // we reuse the random number generator of the bg_particles, TODO: rename it
                     if (type > 0.9) {
-                        entity.pos = Position(x, 2);
-                        entity.vel = Velocity(0,55);
-                        entity.txt_name = "enemy_3";
-                        entity.var = Entity::Enemy(300);
+                        Entity::Enemy *entity = new Entity::Enemy(300);
+                        entity->pos = Position(x, 2);
+                        entity->vel = Velocity(0,55);
+                        entity->txt_name = "enemy_3";
+                        return static_cast<Entity::Type*>(entity);
                     } else if (type > 0.4) {
-                        entity.pos = Position(x, 2);
-                        entity.vel = Velocity(0,45);
-                        entity.txt_name = "enemy_2";
-                        entity.var = Entity::Enemy(200);
+                        Entity::Enemy *entity = new Entity::Enemy(200);
+                        entity->pos = Position(x, 2);
+                        entity->vel = Velocity(0,45);
+                        entity->txt_name = "enemy_2";
+                        return static_cast<Entity::Type*>(entity);
                     } else {
-                        entity.pos = Position(x, 5);
-                        entity.vel = Velocity(0,35);
-                        entity.txt_name = "enemy_1";
-                        entity.var = Entity::Enemy(100);
-                    }
+                        Entity::Enemy *entity = new Entity::Enemy(100);
+                        entity->pos = Position(x, 5);
+                        entity->vel = Velocity(0,35);
+                        entity->txt_name = "enemy_1";
+                        return static_cast<Entity::Type*>(entity);
+                    } 
+
                 });
             };
             void maybe_add_enemy(double prob) {
@@ -197,12 +210,13 @@ namespace Letvetzi {
 
             void add_bullet(Velocity vel) {
                 if (game_over) return restart_game();
-                with_new_entity([&](Entity::Name, Entity::Meta& entity) {
-                    entity.pos        = player;
-                    entity.pos.x     += 46;
-                    entity.txt_name   = "player_laser";
-                    entity.vel        = vel;
-                    entity.var        = Entity::Bullet();
+                with_new_entity([&](Entity::Name) {
+                    Entity::Bullet *entity = new Entity::Bullet();
+                    entity->pos        = player;
+                    entity->pos.x     += 46;
+                    entity->txt_name   = "player_laser";
+                    entity->vel        = vel;
+                    return entity;
                 });
             }
             void restart_game() {
@@ -218,11 +232,10 @@ namespace Letvetzi {
                 };
             };
 
-            void with_new_entity(std::function<void(Entity::Name,Entity::Meta&)> fn) {
+            void with_new_entity(std::function<Entity::Type*(Entity::Name)> fn) {
                  Entity::Name e = last_entity;
                  ++last_entity;
-                 ent_mp.insert(std::pair<Entity::Name, Entity::Meta>(e, Entity::Meta()));
-                 return fn(e,ent_mp.at(e));
+                 ent_mp[e] = std::shared_ptr<Entity::Type>(fn(e));
             }
             void add_points(unsigned int p) {
                 points += p;
@@ -231,29 +244,28 @@ namespace Letvetzi {
     }
 
     namespace Entity {
-        bool on_collision(GameState::Type& gs, Meta& ent_x, Meta& ent_y) {
-                        if (ent_x.var.type() == typeid(Bullet) && ent_y.var.type() == typeid(Enemy)) {
-                                ent_x.kill();
-                                ent_y.kill();
-                                gs.maybe_add_enemy(0.95);
-                                if (gs.ent_mp.size() <= 20) {
-                                    gs.maybe_add_enemy(0.05);
-                                } else {
-                                    gs.maybe_add_enemy(0.002);
-                                };
-                                gs.add_points(boost::get<Enemy>(ent_y.var).score);
-                                return true;
-                        };
-                        if (ent_x.var.type() == typeid(Enemy) && ent_y.var.type() == typeid(Bullet)) {
-                            return on_collision(gs, ent_y, ent_x);
-                        };
-                        return false;
+        bool Collision::on_collision(GameState::Type& gs, Enemy& e, Bullet& b) {
+                    return Collision::on_collision(gs, b, e);
         };
-        void Bullet::out_of_screen(GameState::Type&, Meta& ent) const{
-            ent.kill();
+        bool Collision::on_collision(GameState::Type& gs, Bullet& b, Enemy& e) {
+            b.kill();
+            e.kill();
+            gs.add_enemy();
+            gs.maybe_add_enemy(0.05);
+            gs.add_points(e.score);
+            return true;
         };
-        void Enemy::out_of_screen(GameState::Type& gs, Meta& ent) const {
-            ent.kill();
+        bool Collision::on_collision(GameState::Type&, Bullet&, Bullet&) {
+            return false;
+        };
+        bool Collision::on_collision(GameState::Type&, Enemy&, Enemy&) {
+            return false;
+        };
+        void Bullet::out_of_screen(GameState::Type&) {
+            this->kill();
+        };
+        void Enemy::out_of_screen(GameState::Type& gs) {
+            this->kill();
             gs.add_enemy();
             gs.maybe_add_enemy(0.02);
             gs.lives--;
@@ -400,7 +412,7 @@ namespace Letvetzi {
                 if (!s.game_over) {
                     /* draw entities on the world */
                     for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
-                        if (curr->second.killed) {
+                        if (curr->second->killed) {
                             curr = s.ent_mp.erase(curr);
                         } else {
                             curr++;
@@ -408,40 +420,41 @@ namespace Letvetzi {
                     };
 
                     for (auto& curr : s.ent_mp) {
-                        gs.with(curr.second.txt_name, [&](Game::TextureInfo text) {
-                            apply_velocity(curr.second.pos, curr.second.vel, s.res, fps_relation);
+                        gs.with(curr.second->txt_name, [&](Game::TextureInfo text) {
+                            apply_velocity(curr.second->pos, curr.second->vel, s.res, fps_relation);
                             SDL_Rect curr_rect;
-                            curr_rect.x = curr.second.pos.x;
-                            curr_rect.y = curr.second.pos.y;
+                            curr_rect.x = curr.second->pos.x;
+                            curr_rect.y = curr.second->pos.y;
                             curr_rect.w = text.width;
                             curr_rect.h = text.height;
                             SDL_RenderCopy(gs.win_renderer, text.texture, NULL, &curr_rect);
 
-                            if ((curr.second.pos.x > s.res.width  || curr.second.pos.x < 0) ||
-                                (curr.second.pos.y > s.res.height || curr.second.pos.y < 0) ) {
-                                    boost::apply_visitor(Entity::OutOfScreen(s,curr.second), curr.second.var);
+                            if ((curr.second->pos.x > s.res.width  || curr.second->pos.x < 0) ||
+                                (curr.second->pos.y > s.res.height || curr.second->pos.y < 0) ) {
+                                    //boost::apply_visitor(Entity::OutOfScreen(s,curr.second), curr.second.var);
+                                    curr.second->out_of_screen(s);
                             };
                         });
                     }
 
                     // collision detection
                     for (auto& curr : s.ent_mp) {
-                        gs.with(curr.second.txt_name, [&](Game::TextureInfo text) {
+                        gs.with(curr.second->txt_name, [&](Game::TextureInfo text) {
                             SDL_Rect curr_rect;
-                            curr_rect.x = curr.second.pos.x;
-                            curr_rect.y = curr.second.pos.y;
+                            curr_rect.x = curr.second->pos.x;
+                            curr_rect.y = curr.second->pos.y;
                             curr_rect.w = text.width;
                             curr_rect.h = text.height;
                             for (auto& other : s.ent_mp) {
                                 if (other.first <= curr.first) continue; // we ignore ourselves
-                                gs.with(other.second.txt_name, [&](Game::TextureInfo text2) {
+                                gs.with(other.second->txt_name, [&](Game::TextureInfo text2) {
                                     SDL_Rect other_rect;
-                                    other_rect.x = other.second.pos.x;
-                                    other_rect.y = other.second.pos.y;
+                                    other_rect.x = other.second->pos.x;
+                                    other_rect.y = other.second->pos.y;
                                     other_rect.w = text2.width;
                                     other_rect.h = text2.height;
                                     if (collide(&curr_rect, &other_rect)) {
-                                        Entity::on_collision(s, curr.second, other.second);
+                                        Entity::collision(s, curr.second, other.second);
                                     };
                                 });
                             };
