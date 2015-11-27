@@ -38,7 +38,12 @@ namespace Letvetzi {
         };
     };
 
+    namespace GameState {
+        class Type;
+    };
+
     namespace Entity {
+        struct Meta;
         struct Name {
             uint16_t entity_id;
             Name(uint16_t e) : entity_id(e) {};
@@ -66,47 +71,47 @@ namespace Letvetzi {
             };
         };
 
-        enum Ret {
-            RemoveFromScreen,
-            KeepInScreen
-        };
-
         class Bullet {
             public:
                 Bullet() {
                 };
-                Ret out_of_screen(Position&) {
-                    return RemoveFromScreen;
-                };
+                void out_of_screen(GameState::Type&, Meta&, Position&);
+
         };
         class Enemy {
             public:
                 Enemy() {
                 };
-                Ret out_of_screen(Position&) {
-                    return RemoveFromScreen;
-                };
+                void out_of_screen(GameState::Type&, Meta&, Position&);
         };
 
         class OutOfScreen {
-            Position &pos;
+            Meta&     ent;
+            Position& pos;
+            GameState:Type& gs;
             public:
-                OutOfScreen(Position& pos) : pos(pos) {}
-                Ret operator()(Bullet x) {
-                    return x.out_of_screen(pos);
+                OutOfScreen(GameState::Type& gs, Meta& ent, Position& pos) : ent(ent), pos(pos), gs(gs) {}
+                void operator()(Bullet x) {
+                    x.out_of_screen(gs, ent, pos);
                 }
-                Ret operator()(Enemy x) {
-                    return x.out_of_screen(pos);
+                void operator()(Enemy x) {
+                    x.out_of_screen(gs, ent, pos);
                 }
         };
+
         struct Meta {
             std::string txt_name;
+            bool killed = false;
             Position pos;
             SDL_Rect rect;
             boost::variant<Bullet, Enemy> var;
-            OutOfScreen out_of_screen = OutOfScreen(pos);
+            OutOfScreen out_of_screen/* = OutOfScreen(gs, *this, pos)*/;
+            Meta(GameState::Type& gs) : out_of_screen(OutOfScreen(gs, *this, pos)) { };
+            void kill() {
+                killed = true;
+            };
         };
-    }
+    };
 
 
     namespace GameState {
@@ -137,7 +142,11 @@ namespace Letvetzi {
                 {
                     for (int i=0; i<res.width/20; i++) {
                         add_bg_particle((i*100)%res.height);
-                    }
+                    };
+
+                    for (int i=0; i<5; i++) {
+                        add_enemy();
+                    };
                 };
 
             };
@@ -146,6 +155,15 @@ namespace Letvetzi {
                 int16_t speed = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
                 int16_t ysped = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
                 bg_particles.push_front(Particle("bg_star", Position(x,start_y,Velocity(ysped-70, speed))));
+            };
+
+            void add_enemy() {
+                with_new_entity([&](Entity::Name, Entity::Meta& entity) {
+                    int16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
+                    // we reuse the random number generator of the bg_particles, TODO: rename it
+                    entity.pos = Position(x, 15, Velocity(0,50));
+                    entity.txt_name = "enemy_1";
+                });
             };
 
             void add_bullet(Velocity vel) {
@@ -165,7 +183,24 @@ namespace Letvetzi {
         };
     }
 
-
+    namespace Entity {
+        void on_collision(GameState::Type& gs, Meta& ent_x, Meta& ent_y) {
+                        if ((ent_x.var.type() == typeid(Bullet) && ent_y.var.type() == typeid(Enemy) ) ||
+                            (ent_x.var.type() == typeid(Enemy)  && ent_y.var.type() == typeid(Bullet)) ) {
+                                ent_x.kill();
+                                ent_y.kill();
+                                gs.add_enemy();
+//                        gs.add_points(100);
+                        };
+        };
+        void Bullet::out_of_screen(GameState::Type&, Meta& ent, Position&) {
+            ent.kill();
+        };
+        void Enemy::out_of_screen(GameState::Type& gs, Meta& ent, Position&) {
+            ent.kill();
+            gs.add_enemy();
+        };
+    }
 
     namespace Events {
         class QuitGame {
@@ -224,7 +259,7 @@ namespace Letvetzi {
                         if(ev.key.repeat == 0) {
                             switch(ev.key.keysym.sym) {
                                 case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(-50,0)));
-                                                 break;
+                                                  break;
                                 case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(+50,0)));
 
                                                  break;
@@ -263,6 +298,10 @@ namespace Letvetzi {
      * the speed unit used internally, is defined as `1u = 1% of the screen` approx.
      */
     namespace Render {
+        bool collide(const SDL_Rect *r1, const SDL_Rect *r2) {
+            return (SDL_HasIntersection(r1,r2) == SDL_TRUE);
+        };
+
         Game::LSit handler(Game::sdl_info&              gs,
                                 Conc::VarL<GameState::Type>& svar,
                                 uint16_t                     fps_relation) {
@@ -272,60 +311,76 @@ namespace Letvetzi {
                 SDL_SetRenderDrawColor(gs.win_renderer, 75, 0, 60, 255);
                 SDL_RenderClear(gs.win_renderer);
                 for(auto p = s.bg_particles.begin(); p != s.bg_particles.end() ;) {
-                    gs.with("bg_star", [&](SDL_Texture *bg_star) {
-                         (*p).pos.apply_vel(s.res, fps_relation);
+                    gs.with("bg_star", [&](Game::TextureInfo bg_star) {
+                        p->pos.apply_vel(s.res, fps_relation);
                         /* this could be optimized such that we don't query the texture more than once
                          *  (per frame, or even `just once` in the whole game)
                          */
                         SDL_Rect r;
-                        r.x = (*p).pos.x;
-                        r.y = (*p).pos.y;
-                        SDL_QueryTexture(bg_star, NULL, NULL, &(r.w), &(r.h));
-                        SDL_RenderCopy(gs.win_renderer, bg_star, NULL, &r);
+                        r.x = p->pos.x;
+                        r.y = p->pos.y;
+                        r.w = bg_star.width;
+                        r.h = bg_star.height;
+                        SDL_RenderCopy(gs.win_renderer, bg_star.texture, NULL, &r);
                     });
 
-                    if ((*p).pos.y >= s.res.height || (*p).pos.x <= 0 || (*p).pos.x >= s.res.width) {
+                    if (p->pos.y >= s.res.height || p->pos.x <= 0 || p->pos.x >= s.res.width) {
                         p = s.bg_particles.erase(p);
                         s.add_bg_particle();
                     } else {
-                        ++p;
+                        p++;
                     }
                 }
                 /**/
 
                 /* draw entities on the world */
                 for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
-                    gs.with(curr->second.txt_name, [&](SDL_Texture *texture) {
+                    gs.with(curr->second.txt_name, [&](Game::TextureInfo text) {
                         curr->second.pos.apply_vel(s.res, fps_relation);
-                        SDL_Rect r;
-                        r.x = curr->second.pos.x;
-                        r.y = curr->second.pos.y;
-                        SDL_QueryTexture(texture, NULL, NULL, &(r.w), &(r.h));
-                        SDL_RenderCopy(gs.win_renderer, texture, NULL, &r);
+                        SDL_Rect curr_rect;
+                        curr_rect.x = curr->second.pos.x;
+                        curr_rect.y = curr->second.pos.y;
+                        curr_rect.w = text.width;
+                        curr_rect.h = text.height;
+                        SDL_RenderCopy(gs.win_renderer, text.texture, NULL, &curr_rect);
+
+                        if ((curr->second.pos.x > s.res.width  || curr->second.pos.x < 0) ||
+                            (curr->second.pos.y > s.res.height || curr->second.pos.y < 0) ) {
+                                boost::apply_visitor(curr->second.out_of_screen, curr->second.var);
+                        };
+
+                        // collision detection
+                        for (auto& other : s.ent_mp) {
+                            if (other.first == curr->first) continue; // we ignore ourselves
+                            gs.with(other.second.txt_name, [&](Game::TextureInfo text2) {
+                                SDL_Rect other_rect;
+                                other_rect.x = other.second.pos.x;
+                                other_rect.y = other.second.pos.y;
+                                other_rect.w = text2.width;
+                                other_rect.h = text2.height;
+                                if (collide(&curr_rect, &other_rect)) {
+                                    Entity::on_collision(s, curr->second, other.second);
+                                };
+                            });
+                        };
                     });
-                    Entity::Ret e_ret = Entity::Ret::KeepInScreen;
-                    if ((curr->second.pos.x > s.res.width  || curr->second.pos.x < 0) ||
-                        (curr->second.pos.y > s.res.height || curr->second.pos.y < 0) ) {
-                            e_ret = boost::apply_visitor(curr->second.out_of_screen, curr->second.var);
+                    if (curr->second.killed) {
+                        curr = s.ent_mp.erase(curr);
+                    } else {
+                        curr++;
                     };
-                    switch(e_ret) {
-                        case Entity::Ret::KeepInScreen:
-                                curr++;
-                                break;
-                        case Entity::Ret::RemoveFromScreen:
-                                curr = s.ent_mp.erase(curr); 
-                                break;
-                    }
                 }
 
                 // draw player
-                gs.with("player", [&](SDL_Texture *player) {
+                gs.with("player", [&](Game::TextureInfo player) {
                     SDL_Rect r;
                     r.x = s.player.x;
                     r.y = s.player.y;
-                    SDL_QueryTexture(player, NULL, NULL, &(r.w), &(r.h));
-                    SDL_RenderCopy(gs.win_renderer, player, NULL, &r);
+                    r.w = player.width;
+                    r.h = player.height;
+                    SDL_RenderCopy(gs.win_renderer, player.texture, NULL, &r);
                 });
+
                 if (s.quit) return Game::BreakLoop;
                 return Game::KeepLooping;
             });

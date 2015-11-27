@@ -44,17 +44,24 @@ namespace Game {
     struct Resolution {
         int16_t width;
         int16_t height;
-        Resolution(int16_t width, int16_t height) : width(width), height(height) {
-        }
+        Resolution(int16_t width, int16_t height) : width(width), height(height) {}
+    };
+    struct TextureInfo {
+        SDL_Texture* texture;
+        int width;
+        int height;
+        TextureInfo(SDL_Texture* txt, int width, int height) : texture(txt), width(width), height(height) {}
+        TextureInfo() : texture(NULL), width(0), height(0) {}
     };
 
     class sdl_info {
+    private:
+            uint16_t fps = 60; /* fps >= 0 */
+            std::map<std::string, TextureInfo>  txts;
+            /* std::string til I manage to stop being lazy */
         public:
-            unsigned int fps = 60; /* fps >= 0 */
             SDL_Window*   window        = NULL;
             SDL_Renderer* win_renderer  = NULL;
-            std::map<std::string, SDL_Texture*> map;
-            /* std::string til I manage to stop being lazy */
 
             sdl_info(const char* game_name, int fps_param=60) {
                 window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
@@ -63,8 +70,8 @@ namespace Game {
                 if (fps_param > 0) fps = fps_param;
             }
             ~sdl_info() {
-                for (const auto &pair : map) {
-                    SDL_DestroyTexture(pair.second);
+                for (const auto &pair : txts) {
+                    SDL_DestroyTexture(pair.second.texture);
                 }
                 SDL_DestroyWindow(window);
             }
@@ -77,22 +84,28 @@ namespace Game {
 
             void load_png(std::string key, std::string path) {
                  {
-                    auto it = map.find(key);
-                    if (it != map.end()) return;
+                    auto it = txts.find(key);
+                    if (it != txts.end()) return;
                  }
                  SDL_Surface* loadedSurface = IMG_Load(path.c_str());
                  if (loadedSurface == NULL) { throw SDLError(IMG_GetError()); }
                  SDL_Texture* texture = SDL_CreateTextureFromSurface(win_renderer, loadedSurface);
                  SDL_FreeSurface(loadedSurface);
-                 map[key] = texture;
+                 TextureInfo &inf = txts[key];
+                 SDL_QueryTexture(texture, NULL, NULL, &(inf.width), &(inf.height));
+                 inf.texture = texture;
             }
 
-            void with(std::string key, std::function<void(SDL_Texture*)> fn) {
-                auto it = map.find(key);
-                if (it == map.end()) { throw SDLError("[KEY] image not found"); }
+            void with(std::string key, std::function<void(TextureInfo)> fn) {
+                auto it = txts.find(key);
+                if (it == txts.end()) { throw SDLError("[KEY] image not found"); }
                 auto surf = it->second;
 
+                /* we use .at as if it didn't exist, we already threw a nice error message */
                 return fn(surf);
+            }
+            const std::map<std::string,TextureInfo> textures() {
+                return txts;
             }
 
             /* the second parameter of render_handled specifies the proportion of a second it should work with
@@ -143,6 +156,8 @@ namespace Game {
                     auto sleep_time = std::chrono::milliseconds(fps_relation) - dif;
 
                     SDL_RenderPresent(win_renderer);
+
+                    debt = debt / 2;
 
                     if (sleep_time >= std::chrono::milliseconds(0)) {
                         std::this_thread::sleep_for(sleep_time);
