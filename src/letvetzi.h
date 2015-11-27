@@ -391,14 +391,14 @@ namespace Letvetzi {
                 /**/
 
                 if (!s.game_over) {
-                /* draw entities on the world */
-                for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
-                    if (curr->second.killed) {
-                        curr = s.ent_mp.erase(curr);
-                    } else {
-                        curr++;
+                    /* draw entities on the world */
+                    for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
+                        if (curr->second.killed) {
+                            curr = s.ent_mp.erase(curr);
+                        } else {
+                            curr++;
+                        };
                     };
-                };
 
                     for (auto& curr : s.ent_mp) {
                         gs.with(curr.second.txt_name, [&](Game::TextureInfo text) {
@@ -440,17 +440,16 @@ namespace Letvetzi {
                             };
                         });
                     };
+                    // draw player
+                    gs.with("player", [&](Game::TextureInfo player) {
+                        SDL_Rect r;
+                        r.x = s.player.x;
+                        r.y = s.player.y;
+                        r.w = player.width;
+                        r.h = player.height;
+                        SDL_RenderCopy(gs.win_renderer, player.texture, NULL, &r);
+                    });
                 };
-
-                // draw player
-                gs.with("player", [&](Game::TextureInfo player) {
-                    SDL_Rect r;
-                    r.x = s.player.x;
-                    r.y = s.player.y;
-                    r.w = player.width;
-                    r.h = player.height;
-                    SDL_RenderCopy(gs.win_renderer, player.texture, NULL, &r);
-                });
 
                 // hud
                 SDL_SetRenderDrawColor(gs.win_renderer, 0, 0, 0, 255);
@@ -464,21 +463,24 @@ namespace Letvetzi {
                 };
                 SDL_Color txt_color = {200, 200, 200, 255}; // hud color
                 gs.render_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
-                gs.render_text(48, s.res.height - 48, txt_color, "Lives: ");
-                gs.with("player_life", [&](Game::TextureInfo txt) {
-                    SDL_Rect pos;
-                    pos.x = 48 + (20 * 7);
-                    pos.y = s.res.height - 48;
-                    pos.h = txt.height;
-                    pos.w = txt.width;
-                    for (unsigned int i=0; i < s.lives; i++) {
-                        SDL_RenderCopy(gs.win_renderer, txt.texture, NULL, &pos);
-                        pos.x += txt.width + 8;
-                    };
-                });
-                if (s.game_over) {
+                if (!s.game_over) {
+                    gs.render_text(48, s.res.height - 48, txt_color, "Lives: ");
+                    gs.with("player_life", [&](Game::TextureInfo txt) {
+                        SDL_Rect pos;
+                        pos.x = 48 + (20 * 7);
+                        pos.y = s.res.height - 48;
+                        pos.h = txt.height;
+                        pos.w = txt.width;
+                        for (unsigned int i=0; i < s.lives; i++) {
+                            SDL_RenderCopy(gs.win_renderer, txt.texture, NULL, &pos);
+                            pos.x += txt.width + 8;
+                        };
+                    });
+                } else {
                     SDL_Color game_over_c = {255, 0, 0, 255};
-                    gs.render_text(s.res.width/2, s.res.height - 48, game_over_c, "GAME OVER");
+                    gs.render_text(48, s.res.height - 48, game_over_c, "GAME OVER");
+                    SDL_Color game_over_c2 = {0,0,255,255};
+                    gs.render_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to restart");
                 };
 
                 if (s.quit) return Game::BreakLoop;
