@@ -156,8 +156,8 @@ namespace Letvetzi {
         } collision;
     };
 
-
     namespace GameState {
+
         class Type {
             public:
             uint64_t       points  = 0;
@@ -294,6 +294,7 @@ namespace Letvetzi {
             return true;
         };
         bool Collision::on_collision(GameState::Type& gs, Player&, Enemy& e) {
+            // TODO: balance tweaks, suggestions for this?
             e.kill();
             gs.add_enemy();
             gs.add_enemy();
@@ -365,22 +366,29 @@ namespace Letvetzi {
                 s.add_bullet(ev.vel);
             };
             void operator()(PlayerMove ev) const {
+                if (s.game_state == GameState::Type::RestartGame) {
+                    s.ent_mp[Entity::PlayerID()]->vel = Velocity(0,0);
+                    return;
+                };
                 if (s.game_state == GameState::Type::Running) {
 //                    auto vel = Velocity(0,0);
                     auto curr_vel = s.ent_mp[Entity::PlayerID()];
                     auto speed = Velocity(140, 0);
+                    auto zero  = Velocity(0,0);
                     switch(ev.dir) {
                         case Left:
-                            curr_vel->vel -= speed;
+                            curr_vel->vel = zero-speed;
                             break;
                         case Right:
-                            curr_vel->vel += speed;
+                            curr_vel->vel = zero+speed;
                             break;
                         case StopLeft:
-                            curr_vel->vel += speed;
+                            if (curr_vel->vel.x < zero.x)
+                                curr_vel->vel = zero;
                             break;
                         case StopRight:
-                            curr_vel->vel -= speed;
+                            if (curr_vel->vel.x > zero.x)
+                                curr_vel->vel = zero;
                             break;
                     };
                 };
@@ -458,134 +466,224 @@ namespace Letvetzi {
             return (SDL_HasIntersection(r1,r2) == SDL_TRUE);
         };
 
-        Game::LSit handler_game(Game::sdl_info&                   gs,
-                                Conc::VarL<GameState::Type>& svar,
-                                uint16_t                     fps_relation) {
-            return svar.modify([&](GameState::Type& s) {
-                std::shared_ptr<Entity::Type> player_pointer = s.ent_mp[Entity::PlayerID()];
-                if (s.game_state == GameState::Type::RestartGame) {
-                    s.restart_game();
+        struct HudText {
+            Position    pos;
+            enum FontID {
+                Normal
+            } f_id;
+            std::string text;
+            SDL_Color   col;
+        };
+        struct HudItem {
+            Position pos;
+            std::string texture;
+        };
+        class Hud {
+        public:
+            int start_hud = 0;
+            std::vector<HudText> txts;
+            std::vector<HudItem> items;
+            Hud() {};
+            void add_text(int x, int y, SDL_Color txt_color, std::string text) {
+                txts.push_back(HudText{Position(x,y),HudText::Normal,text,txt_color});
+            };
+            void add_image(std::string txt_name, Position pos) {
+                items.push_back(HudItem{pos,txt_name});
+            };
+        };
+
+        class Eng { /* this is probably a good fit for inheritance
+                       but adding indirections with pointers is boring */
+        private:
+            Game::sdl_info&    sdl_inf;
+            GameState::Type&   s;
+            uint16_t           fps_relation;
+
+        public:
+            Eng(Game::sdl_info&        gs          ,
+                GameState::Type&       s           ,
+                uint16_t               fps_relation)
+                : sdl_inf(gs), s(s), fps_relation(fps_relation) {};
+
+            Game::LSit render_GameOver();
+            Game::LSit render_RestartGame();
+            Game::LSit render_Running();
+            Game::LSit render_QuitGame();
+
+            void render_pic(Position, std::string);
+            void render_background();
+            void render_hud(const Hud&);
+        };
+
+        Game::LSit Eng::render_QuitGame() {
+            return Game::BreakLoop;
+        };
+        Game::LSit Eng::render_RestartGame() {
+            s.restart_game();
+            return render_Running();
+        };
+        Game::LSit Eng::render_Running() {
+
+            std::shared_ptr<Entity::Type> player_pointer = s.ent_mp[Entity::PlayerID()];
+
+            /* draw entities on the world */
+            for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
+                if (curr->second->killed) {
+                    curr = s.ent_mp.erase(curr);
+                } else {
+                    curr++;
                 };
+            };
+
+            for (auto& curr : s.ent_mp) {
+                apply_velocity(curr.second->pos, curr.second->vel, s.res, fps_relation);
+                render_pic(curr.second->pos, curr.second->txt_name);
+                if ((curr.second->pos.x > s.res.width  || curr.second->pos.x < 0) ||
+                    (curr.second->pos.y > s.res.height || curr.second->pos.y < 0) ) {
+                        //boost::apply_visitor(Entity::OutOfScreen(s,curr.second), curr.second.var);
+                        curr.second->out_of_screen(s);
+                };
+            }
+
+            // collision detection
+            for (auto& curr : s.ent_mp) {
+                sdl_inf.with(curr.second->txt_name, [&](Game::TextureInfo text) {
+                    SDL_Rect curr_rect;
+                    curr_rect.x = curr.second->pos.x;
+                    curr_rect.y = curr.second->pos.y;
+                    curr_rect.w = text.width;
+                    curr_rect.h = text.height;
+                    for (auto& other : s.ent_mp) {
+                        if (other.first <= curr.first) continue; // we ignore ourselves
+                        sdl_inf.with(other.second->txt_name, [&](Game::TextureInfo text2) {
+                            SDL_Rect other_rect;
+                            other_rect.x = other.second->pos.x;
+                            other_rect.y = other.second->pos.y;
+                            other_rect.w = text2.width;
+                            other_rect.h = text2.height;
+                            if (collide(&curr_rect, &other_rect)) {
+                                Entity::collision(s, curr.second, other.second);
+                            };
+                        });
+                    };
+                });
+            };
+
+            {
+                Hud hud;
+                SDL_Color txt_color = {200, 200, 200, 255}; // hud color
+                hud.start_hud = s.res.height - 64;
+                hud.add_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
+                hud.add_text(48, s.res.height - 48, txt_color, "Lives: ");
+                Position pos(48 + 20 * 7, s.res.height - 48);
+                for (unsigned int i=0; i < s.lives; i++) {
+                    hud.add_image("player_life", pos);
+                    pos.x += 40;
+                };
+
+                render_hud(hud);
+            };
+
+            return Game::KeepLooping;
+        };
+
+        Game::LSit Eng::render_GameOver() {
+            {
+                Hud hud;
+                SDL_Color txt_color = {200, 200, 200, 255}; // hud color
+                hud.start_hud = s.res.height - 128;
+                hud.add_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
+                SDL_Color game_over_c = {255, 0, 0, 255};
+                hud.add_text(48, s.res.height - 100, game_over_c, "GAME OVER");
+                SDL_Color game_over_c2 = {0,0,255,255};
+                hud.add_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to restart");
+                render_hud(hud);
+            };
+            return Game::KeepLooping;
+        };
+
+        void Eng::render_pic(Position pos, std::string txt_name) {
+            sdl_inf.with(txt_name, [&](Game::TextureInfo text) {
+                SDL_Rect r;
+                r.x = pos.x;
+                r.y = pos.y;
+                r.w = text.width;
+                r.h = text.height;
+                SDL_RenderCopy(sdl_inf.win_renderer, text.texture, NULL, &r);
+            });
+        };
+
+        void Eng::render_hud(const Hud& hud) {
+                // hud
+                SDL_SetRenderDrawColor(sdl_inf.win_renderer, 0, 0, 0, 255);
+                {
+                    SDL_Rect rect;
+                    rect.x = 0;
+                    rect.y = hud.start_hud;
+                    rect.w = s.res.width;
+                    rect.h = s.res.height - hud.start_hud;
+                    SDL_RenderFillRect(sdl_inf.win_renderer, &rect);
+                };
+                for (auto& txt : hud.txts) {
+                    sdl_inf.render_text(txt.pos.x, txt.pos.y, txt.col, txt.text);
+                };
+                for (auto& spr : hud.items) {
+                    sdl_inf.with(spr.texture, [&](Game::TextureInfo txt) {
+                        SDL_Rect pos {spr.pos.x, spr.pos.y, txt.width, txt.height};
+                        SDL_RenderCopy(sdl_inf.win_renderer, txt.texture, NULL, &pos);
+                    });
+                };
+        };
+
+        void Eng::render_background() {
                 // apply background
-                SDL_SetRenderDrawColor(gs.win_renderer, 75, 0, 60, 255);
-                SDL_RenderClear(gs.win_renderer);
-                for(auto p = s.bg_particles.begin(); p != s.bg_particles.end() ;) {
-                    gs.with("bg_star", [&](Game::TextureInfo bg_star) {
+                SDL_SetRenderDrawColor(sdl_inf.win_renderer, 75, 0, 60, 255);
+                SDL_RenderClear(sdl_inf.win_renderer);
+
+                sdl_inf.with("bg_star", [&](Game::TextureInfo bg_star) {
+                    for(auto p = s.bg_particles.begin(); p != s.bg_particles.end() ;) {
                         apply_velocity(p->pos, p->vel, s.res, fps_relation);
-                        /* this could be optimized such that we don't query the texture more than once
-                         *  (per frame, or even `just once` in the whole game)
-                         */
                         SDL_Rect r;
                         r.x = p->pos.x;
                         r.y = p->pos.y;
                         r.w = bg_star.width;
                         r.h = bg_star.height;
-                        SDL_RenderCopyEx(gs.win_renderer, bg_star.texture, NULL, &r, p->angle, NULL, SDL_FLIP_NONE);
+                        SDL_RenderCopyEx(sdl_inf.win_renderer, bg_star.texture, NULL, &r, p->angle, NULL, SDL_FLIP_NONE);
                         p->angle += fps_relation/2;
-                    });
-
-                    if (p->pos.y >= s.res.height || p->pos.x <= 0 || p->pos.x >= s.res.width) {
-                        p = s.bg_particles.erase(p);
-                        s.add_bg_particle();
-                    } else {
-                        p++;
-                    }
-                }
-                /**/
-
-                if (s.game_state != GameState::Type::GameOver) {
-                    /* draw entities on the world */
-                    for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
-                        if (curr->second->killed) {
-                            curr = s.ent_mp.erase(curr);
+                        if (p->pos.y >= s.res.height || p->pos.x <= 0 || p->pos.x >= s.res.width) {
+                            p = s.bg_particles.erase(p);
+                            s.add_bg_particle();
                         } else {
-                            curr++;
-                        };
-                    };
-
-                    for (auto& curr : s.ent_mp) {
-                        gs.with(curr.second->txt_name, [&](Game::TextureInfo text) {
-                            apply_velocity(curr.second->pos, curr.second->vel, s.res, fps_relation);
-                            SDL_Rect curr_rect;
-                            curr_rect.x = curr.second->pos.x;
-                            curr_rect.y = curr.second->pos.y;
-                            curr_rect.w = text.width;
-                            curr_rect.h = text.height;
-                            SDL_RenderCopy(gs.win_renderer, text.texture, NULL, &curr_rect);
-
-                            if ((curr.second->pos.x > s.res.width  || curr.second->pos.x < 0) ||
-                                (curr.second->pos.y > s.res.height || curr.second->pos.y < 0) ) {
-                                    //boost::apply_visitor(Entity::OutOfScreen(s,curr.second), curr.second.var);
-                                    curr.second->out_of_screen(s);
-                            };
-                        });
+                            p++;
+                        }
                     }
+                });
 
-                    // collision detection
-                    for (auto& curr : s.ent_mp) {
-                        gs.with(curr.second->txt_name, [&](Game::TextureInfo text) {
-                            SDL_Rect curr_rect;
-                            curr_rect.x = curr.second->pos.x;
-                            curr_rect.y = curr.second->pos.y;
-                            curr_rect.w = text.width;
-                            curr_rect.h = text.height;
-                            for (auto& other : s.ent_mp) {
-                                if (other.first <= curr.first) continue; // we ignore ourselves
-                                gs.with(other.second->txt_name, [&](Game::TextureInfo text2) {
-                                    SDL_Rect other_rect;
-                                    other_rect.x = other.second->pos.x;
-                                    other_rect.y = other.second->pos.y;
-                                    other_rect.w = text2.width;
-                                    other_rect.h = text2.height;
-                                    if (collide(&curr_rect, &other_rect)) {
-                                        Entity::collision(s, curr.second, other.second);
-                                    };
-                                });
-                            };
-                        });
-                    };
-                    // draw player
-                    gs.with("player", [&](Game::TextureInfo player) {
-                        SDL_Rect r;
-                        r.x = player_pointer->pos.x;
-                        r.y = player_pointer->pos.y;
-                        r.w = player.width;
-                        r.h = player.height;
-                        SDL_RenderCopy(gs.win_renderer, player.texture, NULL, &r);
-                    });
-                };
+                /**/
+        }
 
-                // hud
-                SDL_SetRenderDrawColor(gs.win_renderer, 0, 0, 0, 255);
-                {
-                    SDL_Rect rect;
-                    rect.x = 0;
-                    rect.y = s.res.height - 64;
-                    rect.w = s.res.width;
-                    rect.h = 64;
-                    SDL_RenderFillRect(gs.win_renderer, &rect);
-                };
-                SDL_Color txt_color = {200, 200, 200, 255}; // hud color
-                gs.render_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
-                if (s.game_state != GameState::Type::GameOver) {
-                    gs.render_text(48, s.res.height - 48, txt_color, "Lives: ");
-                    gs.with("player_life", [&](Game::TextureInfo txt) {
-                        SDL_Rect pos;
-                        pos.x = 48 + (20 * 7);
-                        pos.y = s.res.height - 48;
-                        pos.h = txt.height;
-                        pos.w = txt.width;
-                        for (unsigned int i=0; i < s.lives; i++) {
-                            SDL_RenderCopy(gs.win_renderer, txt.texture, NULL, &pos);
-                            pos.x += txt.width + 8;
-                        };
-                    });
-                } else {
-                    SDL_Color game_over_c = {255, 0, 0, 255};
-                    gs.render_text(48, s.res.height - 48, game_over_c, "GAME OVER");
-                    SDL_Color game_over_c2 = {0,0,255,255};
-                    gs.render_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to restart");
-                };
+        Game::LSit handler_game(Game::sdl_info&                   gs,
+                                Conc::VarL<GameState::Type>& svar,
+                                uint16_t                     fps_relation) {
+            return svar.modify([&](GameState::Type& s) {
+                Eng eng = Eng(gs, s, fps_relation);
+                eng.render_background();
+                switch (s.game_state) {
+                    case GameState::Type::GameOver:
+                        return eng.render_GameOver();
+                        break;
+                    case GameState::Type::RestartGame:
+                        return eng.render_RestartGame();
+                        break;
+                    case GameState::Type::Running:
+                        return eng.render_Running();
+                        break;
+                    case GameState::Type::QuitGame:
+                        return eng.render_QuitGame();
+                        break;
+                    default:
+                        break;
+                }
 
                 if (s.game_state == GameState::Type::QuitGame) return Game::BreakLoop;
                 return Game::KeepLooping;
