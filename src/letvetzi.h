@@ -157,7 +157,18 @@ namespace Letvetzi {
     };
 
     namespace GameState {
-
+        struct MenuOption {
+            std::string text;
+            std::function<void(GameState::Type&)> callback;
+        };
+        struct Menu {
+            std::vector<MenuOption> opts;
+            uint16_t current = 0;
+            bool     pressed = false;
+            void move(uint16_t x) {
+                current = (current + x) % opts.size();
+            };
+        };
         class Type {
             public:
             uint64_t       points  = 0;
@@ -166,8 +177,10 @@ namespace Letvetzi {
                 Running      ,
                 GameOver     ,
                 QuitGame     ,
-                RestartGame
+                RestartGame  ,
+                StartMenu
             } game_state;
+            Menu menu;
             Game::Resolution res;
             Position player_original;
             std::list<Particle> bg_particles;
@@ -243,10 +256,6 @@ namespace Letvetzi {
             };
 
             void add_bullet(Velocity vel) {
-                if (game_state == GameOver) {
-                    game_state = RestartGame;
-                    return;
-                }
                 with_new_entity([&](Entity::Name) {
                     Entity::PlayerBullet *entity = new Entity::PlayerBullet();
                     entity->pos        = ent_mp[Entity::PlayerID()]->pos;
@@ -259,9 +268,17 @@ namespace Letvetzi {
             void restart_game(bool first=false) {
                 Velocity vel = Velocity(0,0);
                 if (!first) vel = ent_mp[Entity::PlayerID()]->vel;
+                {
+                    menu.opts.push_back(MenuOption{"Start Game",[](GameState::Type& s) {
+                                            s.game_state = Running;
+                                        }});
+                    menu.opts.push_back(MenuOption{"Quit Game", [](GameState::Type& s) {
+                                            s.game_state = QuitGame;
+                                        }});
+                };
                 points = 0;
                 lives  = 10;
-                game_state = Running;
+                game_state = StartMenu;
                 ent_mp.clear();
                 last_entity = Entity::Name(1);
                 ent_mp[Entity::PlayerID()] = std::shared_ptr<Entity::Type>(new Entity::Player(player_original, vel));
@@ -363,37 +380,62 @@ namespace Letvetzi {
         public:
             ApplyEvent(GameState::Type& s) : s(s) {};
             void operator()(Shoot ev) const {
-                s.add_bullet(ev.vel);
+                switch (s.game_state) {
+                    case GameState::Type::Running:
+                        s.add_bullet(ev.vel);
+                    break;
+                    case GameState::Type::GameOver:
+                        s.game_state = GameState::Type::RestartGame;
+                    break;
+                    case GameState::Type::StartMenu:
+                        s.menu.pressed = true;
+                    break;
+                    case GameState::Type::QuitGame:
+                    case GameState::Type::RestartGame:
+                        break;
+                };
             };
             void operator()(PlayerMove ev) const {
-                if (s.game_state == GameState::Type::RestartGame) {
-                    s.ent_mp[Entity::PlayerID()]->vel = Velocity(0,0);
-                    return;
+                auto curr_vel = s.ent_mp[Entity::PlayerID()];
+                auto speed = Velocity(140, 0);
+                auto zero  = Velocity(0,0);
+                switch (s.game_state) {
+                    case GameState::Type::RestartGame:
+                            s.ent_mp[Entity::PlayerID()]->vel = Velocity(0,0);
+                        break;
+                    case GameState::Type::Running:
+                        switch(ev.dir) {
+                            case Left:
+                                curr_vel->vel = zero-speed;
+                                break;
+                            case Right:
+                                curr_vel->vel = zero+speed;
+                                break;
+                            case StopLeft:
+                                if (curr_vel->vel.x < zero.x)
+                                    curr_vel->vel = zero;
+                                break;
+                            case StopRight:
+                                if (curr_vel->vel.x > zero.x)
+                                    curr_vel->vel = zero;
+                                break;
+                        };
+                        break;
+                    case GameState::Type::StartMenu:
+                        switch(ev.dir) {
+                            case Left:
+                                s.menu.move(-1);
+                                break;
+                            case Right:
+                                s.menu.move(+1);
+                                break;
+                            default:
+                                break;
+                        };
+                        break;
+                    default:
+                        break;
                 };
-                if (s.game_state == GameState::Type::Running) {
-//                    auto vel = Velocity(0,0);
-                    auto curr_vel = s.ent_mp[Entity::PlayerID()];
-                    auto speed = Velocity(140, 0);
-                    auto zero  = Velocity(0,0);
-                    switch(ev.dir) {
-                        case Left:
-                            curr_vel->vel = zero-speed;
-                            break;
-                        case Right:
-                            curr_vel->vel = zero+speed;
-                            break;
-                        case StopLeft:
-                            if (curr_vel->vel.x < zero.x)
-                                curr_vel->vel = zero;
-                            break;
-                        case StopRight:
-                            if (curr_vel->vel.x > zero.x)
-                                curr_vel->vel = zero;
-                            break;
-                    };
-                };
-                    //s.ent_mp[Entity::PlayerID()]->vel =s.ent_mp[Entity::PlayerID()]->vel + ev.vel;
-
             };
             void operator()(QuitGame) const {
                 s.game_state = GameState::Type::QuitGame;
@@ -437,8 +479,8 @@ namespace Letvetzi {
                                              break;
                             case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(Events::StopRight)));
                                              break;
-                            case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(200)));
-                                             break;
+                            /*case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(200)));
+                                             break; */
                             default: break;
                         }
                         break;
@@ -485,7 +527,10 @@ namespace Letvetzi {
             std::vector<HudItem> items;
             Hud() {};
             void add_text(int x, int y, SDL_Color txt_color, std::string text) {
-                txts.push_back(HudText{Position(x,y),HudText::Normal,text,txt_color});
+                add_text(Position(x,y), txt_color, text);
+            };
+            void add_text(Position pos, SDL_Color txt_color, std::string text) {
+                txts.push_back(HudText{pos,HudText::Normal,text,txt_color});
             };
             void add_image(std::string txt_name, Position pos) {
                 items.push_back(HudItem{pos,txt_name});
@@ -493,7 +538,7 @@ namespace Letvetzi {
         };
 
         class Eng { /* this is probably a good fit for inheritance
-                       but adding indirections with pointers is boring */
+                       but adding indirections with pointers/reference is boring */
         private:
             Game::sdl_info&    sdl_inf;
             GameState::Type&   s;
@@ -509,6 +554,7 @@ namespace Letvetzi {
             Game::LSit render_RestartGame();
             Game::LSit render_Running();
             Game::LSit render_QuitGame();
+            Game::LSit render_StartMenu();
 
             void render_pic(Position, std::string);
             void render_background();
@@ -540,7 +586,6 @@ namespace Letvetzi {
                 render_pic(curr.second->pos, curr.second->txt_name);
                 if ((curr.second->pos.x > s.res.width  || curr.second->pos.x < 0) ||
                     (curr.second->pos.y > s.res.height || curr.second->pos.y < 0) ) {
-                        //boost::apply_visitor(Entity::OutOfScreen(s,curr.second), curr.second.var);
                         curr.second->out_of_screen(s);
                 };
             }
@@ -550,7 +595,7 @@ namespace Letvetzi {
                 sdl_inf.with(curr.second->txt_name, [&](Game::TextureInfo text) {
                     SDL_Rect curr_rect { curr.second->pos.x, curr.second->pos.y , text.width, text.height };
                     for (auto& other : s.ent_mp) {
-                        if (other.first <= curr.first) continue; // we ignore ourselves
+                        if (other.first <= curr.first) continue; // we ignore ourselves (and previous checks)   
                         sdl_inf.with(other.second->txt_name, [&](Game::TextureInfo text2) {
                             SDL_Rect other_rect { other.second->pos.x, other.second->pos.y , text2.width , text2.height }; 
                             if (collide(&curr_rect, &other_rect)) {
@@ -589,6 +634,42 @@ namespace Letvetzi {
                 hud.add_text(48, s.res.height - 100, game_over_c, "GAME OVER");
                 SDL_Color game_over_c2 = {0,0,255,255};
                 hud.add_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to restart");
+                render_hud(hud);
+            };
+            return Game::KeepLooping;
+        };
+
+        Game::LSit Eng::render_StartMenu() {
+            {
+                Hud hud;
+                SDL_Color txt_color = {200, 200, 200, 255}; // hud color
+                hud.start_hud = s.res.height - (256+128);;
+                hud.add_text(48, hud.start_hud + 32, txt_color, "Menu");
+                SDL_Color pressed_option {255, 0,   0, 255};
+                SDL_Color current_option {255, 0, 255, 255};
+                SDL_Color other_option   {0,   0, 255, 255};
+                // TODO: see how we could deal with the menu w/o using a normal loop
+                // and still have an easy way to select the next/prev menu entry easily
+                Position pos(32, hud.start_hud + 128); // start pos
+                for (uint16_t i=0; i<s.menu.opts.size(); i++) {
+                    auto c = s.menu.opts[i];
+                    if (i == s.menu.current) {
+                        if (s.menu.pressed) {
+                            hud.add_text(pos, pressed_option, c.text);
+                            s.menu.pressed = false;
+                            c.callback(s);
+                        } else {
+                            hud.add_text(pos, current_option, c.text);
+                        }
+                    } else {
+                            hud.add_text(pos, other_option,   c.text);
+                    };
+                    pos += Position(256,0);
+                };
+/*
+                hud.add_text(48, s.res.height - 100, game_over_c, "GAME OVER");
+                SDL_Color  = {0,0,255,255};
+                hud.add_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to restart"); */
                 render_hud(hud);
             };
             return Game::KeepLooping;
@@ -661,6 +742,9 @@ namespace Letvetzi {
                         break;
                     case GameState::Type::QuitGame:
                         return eng.render_QuitGame();
+                        break;
+                    case GameState::Type::StartMenu:
+                        return eng.render_StartMenu();
                         break;
                     default:
                         break;
