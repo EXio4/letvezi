@@ -10,4 +10,5 @@ LIBS = -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lpthread
 WARNS = -Wall -Wextra -Werror -pedantic
 
 all : $(OBJS)
+	mkdir -p build/
 	clang++ -std=c++14 $(OBJS) -g -O0 $(WARNS) -I$(DIR) $(LIBS) -o $(OBJ_NAME)
