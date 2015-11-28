@@ -179,10 +179,12 @@ namespace Letvetzi {
                 GameOver     ,
                 QuitGame     ,
                 RestartGame  ,
-                GameMenu
+                GameMenu     ,
+                Credits
             } game_state;
             Menu menu;
             Game::Resolution res;
+            Position credit_text_pos = Position(32,60);
             Position player_original;
             std::list<Particle> bg_particles;
             struct {
@@ -274,6 +276,10 @@ namespace Letvetzi {
                         menu.title = "LETVEZI";
                         menu.opts.push_back(MenuOption{"Start Game",[](GameState::Type& s) {
                                                 s.game_state = Running;
+                                            }});
+                        menu.opts.push_back(MenuOption{"Credits",[&](GameState::Type& s) {
+                                                s.credit_text_pos = Position(s.res.width/4, res.height + 32);
+                                                s.game_state = Credits;
                                             }});
                         menu.opts.push_back(MenuOption{"Quit Game", [](GameState::Type& s) {
                                                 s.game_state = QuitGame;
@@ -405,6 +411,8 @@ namespace Letvetzi {
                     case GameState::Type::GameMenu:
                         s.menu.pressed = 150;
                     break;
+                    case GameState::Type::Credits:
+                        s.game_state = GameState::Type::GameMenu; // we go back to the menu, whatever it was before...
                     case GameState::Type::QuitGame:
                     case GameState::Type::RestartGame:
                         break;
@@ -474,6 +482,7 @@ namespace Letvetzi {
                     case GameState::Type::RestartGame:
                     case GameState::Type::QuitGame:
                     case GameState::Type::GameMenu:
+                    case GameState::Type::Credits:
                     default:
                     break;
                 };
@@ -592,6 +601,7 @@ namespace Letvetzi {
             Game::LSit render_Running();
             Game::LSit render_QuitGame();
             Game::LSit render_GameMenu();
+            Game::LSit render_Credits();
 
             void render_pic(Position, std::string);
             void render_background();
@@ -673,6 +683,47 @@ namespace Letvetzi {
                 hud.add_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to restart");
                 render_hud(hud);
             };
+            return Game::KeepLooping;
+        };
+
+        Game::LSit Eng::render_Credits() {
+            Position pos = s.credit_text_pos;
+            Hud      hud;
+            SDL_Color txt_color = {200, 200, 200, 255};
+            if (pos.y < -200) s.game_state = GameState::Type::GameMenu;
+            hud.start_hud = 64;
+            std::vector<std::pair<Game::FontID,std::string>> entries {
+                {Game::Huge  , "Credits"                         },
+                {Game::Normal, ""                                },
+                {Game::Huge  , "LETVEZI"                         },
+                {Game::Normal, ""                                },
+                {Game::Huge  , "Programming work and design"     },
+                {Game::Normal, "      Name1"                     },
+                {Game::Normal, "      Name2"                     },
+                {Game::Normal, "      Name3"                     },
+                {Game::Normal, ""                                },
+                {Game::Normal, "Art"                             },
+                {Game::Normal, "      Kenney (http://kenney.nl/)"}
+            };
+            for (auto& i : entries) {
+                hud.add_text(pos, txt_color, i.second, i.first);
+                if (pos.x >= s.res.width || pos.y >= s.res.height) break;
+                Position rel = Position(0,0);
+                switch(i.first) {
+                    case Game::Small:
+                            rel = Position(0,64);
+                        break;
+                    case Game::Normal:
+                            rel = Position(0,96);
+                        break;
+                    case Game::Huge:
+                            rel = Position(0,128);
+                        break;
+                };
+                pos += rel;
+            };
+            render_hud(hud);
+            apply_velocity(s.credit_text_pos, Velocity(0, -30), s.res, fps_relation);
             return Game::KeepLooping;
         };
 
@@ -782,7 +833,8 @@ namespace Letvetzi {
                     case GameState::Type::GameMenu:
                         return eng.render_GameMenu();
                         break;
-                    default:
+                    case GameState::Type::Credits:
+                        return eng.render_Credits();
                         break;
                 }
             });

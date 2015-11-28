@@ -70,9 +70,9 @@ namespace Game {
                 if (window == NULL) { throw SDLError(); }
                 win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED );
                 if (fps_param > 0) fps = fps_param;
-                fonts[Small]  = TTF_OpenFont(font_name.c_str(), 18);
+                fonts[Small]  = TTF_OpenFont(font_name.c_str(), 20);
                 fonts[Normal] = TTF_OpenFont(font_name.c_str(), 24);
-                fonts[Huge]   = TTF_OpenFont(font_name.c_str(), 48);
+                fonts[Huge]   = TTF_OpenFont(font_name.c_str(), 32);
             }
             ~sdl_info() {
                 for (const auto &pair : txts) {
@@ -105,6 +105,7 @@ namespace Game {
                 SDL_Rect  pos;
                 SDL_Surface* textSurface = TTF_RenderUTF8_Solid(fonts[f_id], text.c_str(), txt_color);
                 SDL_Texture* textTexture = SDL_CreateTextureFromSurface(win_renderer, textSurface);
+                if (textSurface == NULL) return;
                 pos.h = textSurface->h;
                 pos.w = textSurface->w;
                 pos.x = x;
