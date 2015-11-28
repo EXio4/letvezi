@@ -269,6 +269,8 @@ namespace Letvetzi {
                 Velocity vel = Velocity(0,0);
                 if (!first) vel = ent_mp[Entity::PlayerID()]->vel;
                 {
+                    menu.opts.clear();
+                    menu.current = 0;
                     menu.opts.push_back(MenuOption{"Start Game",[](GameState::Type& s) {
                                             s.game_state = Running;
                                         }});
