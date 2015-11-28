@@ -158,14 +158,17 @@ namespace Letvetzi {
 
 
     namespace GameState {
-
         class Type {
             public:
-            unsigned int points = 0;
-            unsigned int lives  = 10;
-            bool game_over = false;
+            uint64_t       points  = 0;
+            unsigned int   lives   = 10;
+            enum Current {
+                Running      ,
+                GameOver     ,
+                QuitGame     ,
+                RestartGame
+            } game_state;
             Game::Resolution res;
-            bool quit;
             Position player_original;
             std::list<Particle> bg_particles;
             struct {
@@ -176,8 +179,8 @@ namespace Letvetzi {
             } bg_particles_gen;
             std::map<Entity::Name,std::shared_ptr<Entity::Type>> ent_mp;
             Entity::Name last_entity = Entity::Name(1);
-            Type(Game::Resolution res_p, Position player_p, bool quit_p = false)
-               : res(res_p), quit(quit_p), player_original(player_p) {
+            Type(Game::Resolution res_p, Position player_p)
+               : res(res_p), player_original(player_p) {
                 { std::random_device rd;
                   std::default_random_engine r_eg(rd());;
                   std::uniform_int_distribution<int16_t> start_pos(0, res.width); // start positions \x -> (x,0)
@@ -209,6 +212,8 @@ namespace Letvetzi {
                 with_new_entity([&](Entity::Name) {
                     int16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
                     double  type  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
+                    // we don't let enemies spawn too past
+                    x = std::min<int16_t>(x, res.width - 100);
                     // we reuse the random number generator of the bg_particles, TODO: rename it
                     if (type > 0.9) {
                         Entity::Enemy *entity = new Entity::Enemy(300);
@@ -238,7 +243,10 @@ namespace Letvetzi {
             };
 
             void add_bullet(Velocity vel) {
-                if (game_over) return restart_game();
+                if (game_state == GameOver) {
+                    game_state = RestartGame;
+                    return;
+                }
                 with_new_entity([&](Entity::Name) {
                     Entity::PlayerBullet *entity = new Entity::PlayerBullet();
                     entity->pos        = ent_mp[Entity::PlayerID()]->pos;
@@ -253,7 +261,7 @@ namespace Letvetzi {
                 if (!first) vel = ent_mp[Entity::PlayerID()]->vel;
                 points = 0;
                 lives  = 10;
-                game_over = false;
+                game_state = Running;
                 ent_mp.clear();
                 last_entity = Entity::Name(1);
                 ent_mp[Entity::PlayerID()] = std::shared_ptr<Entity::Type>(new Entity::Player(player_original, vel));
@@ -267,7 +275,7 @@ namespace Letvetzi {
                  ++last_entity;
                  ent_mp[e] = std::shared_ptr<Entity::Type>(fn(e));
             }
-            void add_points(unsigned int p) {
+            void add_points(uint32_t p) {
                 points += p;
             };
         };
@@ -285,8 +293,10 @@ namespace Letvetzi {
             gs.add_points(e.score);
             return true;
         };
-        bool Collision::on_collision(GameState::Type& gs, Player&, Enemy&) {
-            gs.game_over = true;
+        bool Collision::on_collision(GameState::Type& gs, Player&, Enemy& e) {
+            e.kill();
+            gs.add_enemy();
+            gs.add_enemy();
             return true;
         };
         bool Collision::on_collision(GameState::Type& gs, Enemy& e, Player& p) {
@@ -315,7 +325,7 @@ namespace Letvetzi {
             gs.add_enemy();
             gs.maybe_add_enemy(0.02);
             gs.lives--;
-            if (gs.lives == 0) gs.game_over = true;
+            if (gs.lives == 0) gs.game_state = GameState::Type::GameOver;
         };
     }
 
@@ -324,11 +334,18 @@ namespace Letvetzi {
             public:
                 QuitGame() { };
         };
+
+        enum PlayerDir {
+            Left     ,
+            Right    ,
+            StopLeft ,
+            StopRight,
+        };
+
         class PlayerMove {
             public:
-                Velocity vel;
-                PlayerMove(int16_t x, int16_t y) : vel(Velocity(x,y)){
-                }
+                PlayerDir dir;
+                PlayerMove(PlayerDir dir) : dir(dir) {}
         };
 
         class Shoot {
@@ -348,11 +365,31 @@ namespace Letvetzi {
                 s.add_bullet(ev.vel);
             };
             void operator()(PlayerMove ev) const {
-                s.ent_mp[Entity::PlayerID()]->vel =s.ent_mp[Entity::PlayerID()]->vel + ev.vel;
+                if (s.game_state == GameState::Type::Running) {
+//                    auto vel = Velocity(0,0);
+                    auto curr_vel = s.ent_mp[Entity::PlayerID()];
+                    auto speed = Velocity(140, 0);
+                    switch(ev.dir) {
+                        case Left:
+                            curr_vel->vel -= speed;
+                            break;
+                        case Right:
+                            curr_vel->vel += speed;
+                            break;
+                        case StopLeft:
+                            curr_vel->vel += speed;
+                            break;
+                        case StopRight:
+                            curr_vel->vel -= speed;
+                            break;
+                    };
+                };
+                    //s.ent_mp[Entity::PlayerID()]->vel =s.ent_mp[Entity::PlayerID()]->vel + ev.vel;
+
             };
             void operator()(QuitGame) const {
-                s.quit = true;
-            }
+                s.game_state = GameState::Type::QuitGame;
+            };
         };
 
         struct Type {
@@ -365,7 +402,6 @@ namespace Letvetzi {
 
     void event_handler(Conc::Chan<SDL_Event>&    sdl_events ,
                        Conc::Chan<Events::Type>& game_events) {
-        const int speed = 140;
         while(true) {
             SDL_Event ev = sdl_events.pop();
             switch(ev.type) {
@@ -376,10 +412,9 @@ namespace Letvetzi {
                 case SDL_KEYDOWN:
                         if(ev.key.repeat == 0) {
                             switch(ev.key.keysym.sym) {
-                                case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(-speed,0)));
+                                case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(Events::Left)));
                                                   break;
-                                case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(+speed,0)));
-
+                                case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(Events::Right)));
                                                  break;
                             }
                         }
@@ -390,9 +425,9 @@ namespace Letvetzi {
                         break;
                 case SDL_KEYUP:
                         switch(ev.key.keysym.sym) {
-                            case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(+speed,0)));
+                            case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(Events::StopLeft)));
                                              break;
-                            case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(-speed,0)));
+                            case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(Events::StopRight)));
                                              break;
                             case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(200)));
                                              break;
@@ -409,7 +444,7 @@ namespace Letvetzi {
             Events::Type ev = game_events.pop();
             svar.modify([&](GameState::Type& s) {
                 boost::apply_visitor(Events::ApplyEvent(s), ev.data);
-                if (s.quit) return;
+                if (s.game_state == GameState::Type::QuitGame) return;
             });
         };
     };
@@ -423,11 +458,14 @@ namespace Letvetzi {
             return (SDL_HasIntersection(r1,r2) == SDL_TRUE);
         };
 
-        Game::LSit handler(Game::sdl_info&                   gs,
+        Game::LSit handler_game(Game::sdl_info&                   gs,
                                 Conc::VarL<GameState::Type>& svar,
                                 uint16_t                     fps_relation) {
             return svar.modify([&](GameState::Type& s) {
                 std::shared_ptr<Entity::Type> player_pointer = s.ent_mp[Entity::PlayerID()];
+                if (s.game_state == GameState::Type::RestartGame) {
+                    s.restart_game();
+                };
                 // apply background
                 SDL_SetRenderDrawColor(gs.win_renderer, 75, 0, 60, 255);
                 SDL_RenderClear(gs.win_renderer);
@@ -455,7 +493,7 @@ namespace Letvetzi {
                 }
                 /**/
 
-                if (!s.game_over) {
+                if (s.game_state != GameState::Type::GameOver) {
                     /* draw entities on the world */
                     for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
                         if (curr->second->killed) {
@@ -529,7 +567,7 @@ namespace Letvetzi {
                 };
                 SDL_Color txt_color = {200, 200, 200, 255}; // hud color
                 gs.render_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
-                if (!s.game_over) {
+                if (s.game_state != GameState::Type::GameOver) {
                     gs.render_text(48, s.res.height - 48, txt_color, "Lives: ");
                     gs.with("player_life", [&](Game::TextureInfo txt) {
                         SDL_Rect pos;
@@ -549,7 +587,7 @@ namespace Letvetzi {
                     gs.render_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to restart");
                 };
 
-                if (s.quit) return Game::BreakLoop;
+                if (s.game_state == GameState::Type::QuitGame) return Game::BreakLoop;
                 return Game::KeepLooping;
             });
         };

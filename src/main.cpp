@@ -41,7 +41,7 @@ int main() {
                 Letvetzi::game_handler;
         std::function<Game::LSit(Conc::VarL<Letvetzi::GameState::Type>&,uint16_t)> render_fn =
                 [&](Conc::VarL<Letvetzi::GameState::Type>& typ,uint16_t fps_rel) {
-                            return Letvetzi::Render::handler(gs,typ,fps_rel);
+                            return Letvetzi::Render::handler_game(gs,typ,fps_rel);
                         };
 
         gs.loop(event_fn, game_fn, render_fn, start_state);

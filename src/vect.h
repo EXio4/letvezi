@@ -13,10 +13,21 @@ template <typename T>
 Vec<T> operator+(Vec<T> a, Vec<T> b) {
     return Vec<T>(a.x + b.x, a.y + b.y);
 };
+template <typename T>
+Vec<T>& operator+=(Vec<T>& a, Vec<T> b) {
+    a = a + b;
+    return a;
+};
 
 template <typename T>
 Vec<T> operator-(Vec<T> a, Vec<T> b) {
     return Vec<T>(a.x - b.x, a.y - b.y);
+};
+
+template <typename T>
+Vec<T>& operator-=(Vec<T>& a, Vec<T> b) {
+    a = a - b;
+    return a;
 };
 
 template <typename T>
