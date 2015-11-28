@@ -162,10 +162,11 @@ namespace Letvetzi {
             std::function<void(GameState::Type&)> callback;
         };
         struct Menu {
+            std::string title;
             std::vector<MenuOption> opts;
-            uint16_t current = 0;
-            bool     pressed = false;
-            void move(uint16_t x) {
+            int16_t current = 0;
+            int16_t pressed = 0;
+            void move(int16_t x) {
                 current = (current + x) % opts.size();
             };
         };
@@ -178,7 +179,7 @@ namespace Letvetzi {
                 GameOver     ,
                 QuitGame     ,
                 RestartGame  ,
-                StartMenu
+                GameMenu
             } game_state;
             Menu menu;
             Game::Resolution res;
@@ -269,24 +270,32 @@ namespace Letvetzi {
                 Velocity vel = Velocity(0,0);
                 if (!first) vel = ent_mp[Entity::PlayerID()]->vel;
                 {
-                    menu.opts.clear();
-                    menu.current = 0;
-                    menu.opts.push_back(MenuOption{"Start Game",[](GameState::Type& s) {
-                                            s.game_state = Running;
-                                        }});
-                    menu.opts.push_back(MenuOption{"Quit Game", [](GameState::Type& s) {
-                                            s.game_state = QuitGame;
-                                        }});
+                    with_menu([&](Menu& menu) {
+                        menu.title = "LETVEZI";
+                        menu.opts.push_back(MenuOption{"Start Game",[](GameState::Type& s) {
+                                                s.game_state = Running;
+                                            }});
+                        menu.opts.push_back(MenuOption{"Quit Game", [](GameState::Type& s) {
+                                                s.game_state = QuitGame;
+                                            }});
+                    });
                 };
                 points = 0;
                 lives  = 10;
-                game_state = StartMenu;
                 ent_mp.clear();
                 last_entity = Entity::Name(1);
                 ent_mp[Entity::PlayerID()] = std::shared_ptr<Entity::Type>(new Entity::Player(player_original, vel));
                 for (int i=0; i<5; i++) {
                     add_enemy();
                 };
+            };
+
+            void with_menu(std::function<void(Menu&)> fn) {
+                game_state = GameMenu;
+                menu.current = 0;
+                menu.pressed = 0;
+                menu.opts.clear();
+                fn(menu);
             };
 
             void with_new_entity(std::function<Entity::Type*(Entity::Name)> fn) {
@@ -375,6 +384,10 @@ namespace Letvetzi {
                 Shoot(int16_t accel)  : vel(Velocity(0,-accel)) {
                 };
         };
+        class EscKey {
+            public:
+                EscKey() {};
+        };
 
         class ApplyEvent : public boost::static_visitor<void> {
         private:
@@ -389,8 +402,8 @@ namespace Letvetzi {
                     case GameState::Type::GameOver:
                         s.game_state = GameState::Type::RestartGame;
                     break;
-                    case GameState::Type::StartMenu:
-                        s.menu.pressed = true;
+                    case GameState::Type::GameMenu:
+                        s.menu.pressed = 150;
                     break;
                     case GameState::Type::QuitGame:
                     case GameState::Type::RestartGame:
@@ -423,16 +436,18 @@ namespace Letvetzi {
                                 break;
                         };
                         break;
-                    case GameState::Type::StartMenu:
-                        switch(ev.dir) {
-                            case Left:
-                                s.menu.move(-1);
-                                break;
-                            case Right:
-                                s.menu.move(+1);
-                                break;
-                            default:
-                                break;
+                    case GameState::Type::GameMenu:
+                        if (s.menu.pressed <= 0) {
+                            switch(ev.dir) {
+                                case Left:
+                                    s.menu.move(-1);
+                                    break;
+                                case Right:
+                                    s.menu.move(+1);
+                                    break;
+                                default:
+                                    break;
+                            };
                         };
                         break;
                     default:
@@ -442,12 +457,33 @@ namespace Letvetzi {
             void operator()(QuitGame) const {
                 s.game_state = GameState::Type::QuitGame;
             };
+            void operator()(EscKey) const {
+                switch (s.game_state) {
+                    case GameState::Type::Running:
+                        s.with_menu([&](GameState::Menu& menu) {
+                            menu.title = "PAUSE";
+                            menu.opts.push_back(GameState::MenuOption{"Continue playing", [](GameState::Type& s) {
+                                s.game_state = GameState::Type::Running;
+                            }});
+                            menu.opts.push_back(GameState::MenuOption{"Quit game", [](GameState::Type& s) {
+                                s.game_state = GameState::Type::QuitGame;
+                            }});
+                        });
+                    break;
+                    case GameState::Type::GameOver:
+                    case GameState::Type::RestartGame:
+                    case GameState::Type::QuitGame:
+                    case GameState::Type::GameMenu:
+                    default:
+                    break;
+                };
+            };
         };
 
         struct Type {
             public:
-                boost::variant<QuitGame, PlayerMove, Shoot> data;
-            Type(boost::variant<QuitGame, PlayerMove, Shoot> data) : data(data) {};
+                boost::variant<QuitGame, PlayerMove, Shoot, EscKey> data;
+            Type(boost::variant<QuitGame, PlayerMove, Shoot, EscKey> data) : data(data) {};
         };
     }
 
@@ -468,6 +504,7 @@ namespace Letvetzi {
                                                   break;
                                 case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(Events::Right)));
                                                  break;
+                                case SDLK_ESCAPE: game_events.push(Events::Type(Events::EscKey()));
                             }
                         }
                         switch(ev.key.keysym.sym) {
@@ -511,12 +548,10 @@ namespace Letvetzi {
         };
 
         struct HudText {
-            Position    pos;
-            enum FontID {
-                Normal
-            } f_id;
-            std::string text;
-            SDL_Color   col;
+            Position     pos ;
+            Game::FontID f_id;
+            std::string  text;
+            SDL_Color    col ;
         };
         struct HudItem {
             Position pos;
@@ -531,8 +566,8 @@ namespace Letvetzi {
             void add_text(int x, int y, SDL_Color txt_color, std::string text) {
                 add_text(Position(x,y), txt_color, text);
             };
-            void add_text(Position pos, SDL_Color txt_color, std::string text) {
-                txts.push_back(HudText{pos,HudText::Normal,text,txt_color});
+            void add_text(Position pos, SDL_Color txt_color, std::string text, Game::FontID f_id=Game::Normal) {
+                txts.push_back(HudText{pos,f_id,text,txt_color});
             };
             void add_image(std::string txt_name, Position pos) {
                 items.push_back(HudItem{pos,txt_name});
@@ -556,7 +591,7 @@ namespace Letvetzi {
             Game::LSit render_RestartGame();
             Game::LSit render_Running();
             Game::LSit render_QuitGame();
-            Game::LSit render_StartMenu();
+            Game::LSit render_GameMenu();
 
             void render_pic(Position, std::string);
             void render_background();
@@ -568,7 +603,7 @@ namespace Letvetzi {
         };
         Game::LSit Eng::render_RestartGame() {
             s.restart_game();
-            return render_Running();
+            return render_GameMenu();
         };
         Game::LSit Eng::render_Running() {
 
@@ -641,12 +676,12 @@ namespace Letvetzi {
             return Game::KeepLooping;
         };
 
-        Game::LSit Eng::render_StartMenu() {
+        Game::LSit Eng::render_GameMenu() {
             {
                 Hud hud;
                 SDL_Color txt_color = {200, 200, 200, 255}; // hud color
                 hud.start_hud = s.res.height - (256+128);;
-                hud.add_text(48, hud.start_hud + 32, txt_color, "Menu");
+                hud.add_text(Position(48, hud.start_hud + 32), txt_color, s.menu.title, Game::Huge);
                 SDL_Color pressed_option {255, 0,   0, 255};
                 SDL_Color current_option {255, 0, 255, 255};
                 SDL_Color other_option   {0,   0, 255, 255};
@@ -656,22 +691,21 @@ namespace Letvetzi {
                 for (uint16_t i=0; i<s.menu.opts.size(); i++) {
                     auto c = s.menu.opts[i];
                     if (i == s.menu.current) {
-                        if (s.menu.pressed) {
+                        if (s.menu.pressed > 0) {
                             hud.add_text(pos, pressed_option, c.text);
-                            s.menu.pressed = false;
-                            c.callback(s);
+                            s.menu.pressed -= fps_relation;
+                            if (s.menu.pressed <= 0) {
+                                s.menu.pressed = 0;
+                                c.callback(s);
+                            };
                         } else {
                             hud.add_text(pos, current_option, c.text);
                         }
                     } else {
                             hud.add_text(pos, other_option,   c.text);
                     };
-                    pos += Position(256,0);
+                    pos += Position(c.text.length() * 32 ,0);
                 };
-/*
-                hud.add_text(48, s.res.height - 100, game_over_c, "GAME OVER");
-                SDL_Color  = {0,0,255,255};
-                hud.add_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to restart"); */
                 render_hud(hud);
             };
             return Game::KeepLooping;
@@ -696,7 +730,7 @@ namespace Letvetzi {
                     SDL_RenderFillRect(sdl_inf.win_renderer, &rect);
                 };
                 for (auto& txt : hud.txts) {
-                    sdl_inf.render_text(txt.pos.x, txt.pos.y, txt.col, txt.text);
+                    sdl_inf.render_text(txt.pos.x, txt.pos.y, txt.f_id, txt.col, txt.text);
                 };
                 for (auto& spr : hud.items) {
                     render_pic(Position(spr.pos.x, spr.pos.y), spr.texture);
@@ -745,8 +779,8 @@ namespace Letvetzi {
                     case GameState::Type::QuitGame:
                         return eng.render_QuitGame();
                         break;
-                    case GameState::Type::StartMenu:
-                        return eng.render_StartMenu();
+                    case GameState::Type::GameMenu:
+                        return eng.render_GameMenu();
                         break;
                     default:
                         break;

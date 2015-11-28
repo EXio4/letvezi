@@ -36,6 +36,12 @@ namespace Game {
         BreakLoop,
     };
 
+    enum FontID {
+        Small   ,
+        Normal  ,
+        Huge
+    };
+
     struct Resolution {
         int16_t width;
         int16_t height;
@@ -57,14 +63,16 @@ namespace Game {
         public:
             SDL_Window*   window        = NULL;
             SDL_Renderer* win_renderer  = NULL;
-            TTF_Font*     font          = NULL;
+            std::map<FontID,TTF_Font*> fonts;
 
             sdl_info(const char* game_name, std::string font_name, int fps_param=60) {
                 window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
                 if (window == NULL) { throw SDLError(); }
                 win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED );
                 if (fps_param > 0) fps = fps_param;
-                font = TTF_OpenFont(font_name.c_str(), 24);
+                fonts[Small]  = TTF_OpenFont(font_name.c_str(), 18);
+                fonts[Normal] = TTF_OpenFont(font_name.c_str(), 24);
+                fonts[Huge]   = TTF_OpenFont(font_name.c_str(), 48);
             }
             ~sdl_info() {
                 for (const auto &pair : txts) {
@@ -93,9 +101,9 @@ namespace Game {
                  inf.texture = texture;
             }
 
-            void render_text(int x, int y, SDL_Color txt_color, std::string text) {
+            void render_text(int x, int y, FontID f_id, SDL_Color txt_color, std::string text) {
                 SDL_Rect  pos;
-                SDL_Surface* textSurface = TTF_RenderUTF8_Solid(font, text.c_str(), txt_color);
+                SDL_Surface* textSurface = TTF_RenderUTF8_Solid(fonts[f_id], text.c_str(), txt_color);
                 SDL_Texture* textTexture = SDL_CreateTextureFromSurface(win_renderer, textSurface);
                 pos.h = textSurface->h;
                 pos.w = textSurface->w;
