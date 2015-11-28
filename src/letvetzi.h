@@ -548,19 +548,11 @@ namespace Letvetzi {
             // collision detection
             for (auto& curr : s.ent_mp) {
                 sdl_inf.with(curr.second->txt_name, [&](Game::TextureInfo text) {
-                    SDL_Rect curr_rect;
-                    curr_rect.x = curr.second->pos.x;
-                    curr_rect.y = curr.second->pos.y;
-                    curr_rect.w = text.width;
-                    curr_rect.h = text.height;
+                    SDL_Rect curr_rect { curr.second->pos.x, curr.second->pos.y , text.width, text.height };
                     for (auto& other : s.ent_mp) {
                         if (other.first <= curr.first) continue; // we ignore ourselves
                         sdl_inf.with(other.second->txt_name, [&](Game::TextureInfo text2) {
-                            SDL_Rect other_rect;
-                            other_rect.x = other.second->pos.x;
-                            other_rect.y = other.second->pos.y;
-                            other_rect.w = text2.width;
-                            other_rect.h = text2.height;
+                            SDL_Rect other_rect { other.second->pos.x, other.second->pos.y , text2.width , text2.height }; 
                             if (collide(&curr_rect, &other_rect)) {
                                 Entity::collision(s, curr.second, other.second);
                             };
@@ -617,21 +609,14 @@ namespace Letvetzi {
                 // hud
                 SDL_SetRenderDrawColor(sdl_inf.win_renderer, 0, 0, 0, 255);
                 {
-                    SDL_Rect rect;
-                    rect.x = 0;
-                    rect.y = hud.start_hud;
-                    rect.w = s.res.width;
-                    rect.h = s.res.height - hud.start_hud;
+                    SDL_Rect rect {0, hud.start_hud, s.res.width, s.res.height - hud.start_hud};
                     SDL_RenderFillRect(sdl_inf.win_renderer, &rect);
                 };
                 for (auto& txt : hud.txts) {
                     sdl_inf.render_text(txt.pos.x, txt.pos.y, txt.col, txt.text);
                 };
                 for (auto& spr : hud.items) {
-                    sdl_inf.with(spr.texture, [&](Game::TextureInfo txt) {
-                        SDL_Rect pos {spr.pos.x, spr.pos.y, txt.width, txt.height};
-                        SDL_RenderCopy(sdl_inf.win_renderer, txt.texture, NULL, &pos);
-                    });
+                    render_pic(Position(spr.pos.x, spr.pos.y), spr.texture);
                 };
         };
 
@@ -643,11 +628,7 @@ namespace Letvetzi {
                 sdl_inf.with("bg_star", [&](Game::TextureInfo bg_star) {
                     for(auto p = s.bg_particles.begin(); p != s.bg_particles.end() ;) {
                         apply_velocity(p->pos, p->vel, s.res, fps_relation);
-                        SDL_Rect r;
-                        r.x = p->pos.x;
-                        r.y = p->pos.y;
-                        r.w = bg_star.width;
-                        r.h = bg_star.height;
+                        SDL_Rect r {p->pos.x, p->pos.y, bg_star.width, bg_star.height};
                         SDL_RenderCopyEx(sdl_inf.win_renderer, bg_star.texture, NULL, &r, p->angle, NULL, SDL_FLIP_NONE);
                         p->angle += fps_relation/2;
                         if (p->pos.y >= s.res.height || p->pos.x <= 0 || p->pos.x >= s.res.width) {
@@ -684,9 +665,6 @@ namespace Letvetzi {
                     default:
                         break;
                 }
-
-                if (s.game_state == GameState::Type::QuitGame) return Game::BreakLoop;
-                return Game::KeepLooping;
             });
         };
     }
