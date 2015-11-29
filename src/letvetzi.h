@@ -558,9 +558,8 @@ namespace Letvetzi {
             // TODO: balance tweaks, suggestions for this?
             e.kill();
             if (!p.shield) {
-                gs.add_enemy();
-            } else {
                 gs.add_life(-1);
+                gs.add_enemy();
             };
             gs.add_enemy();
             return true;
