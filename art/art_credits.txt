@@ -1,5 +1,0 @@
-enemy_1.png:
-player.png:
-player_laser.png:
-
-Under CC0, taken from http://kenney.nl/

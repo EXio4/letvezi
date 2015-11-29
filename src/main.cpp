@@ -21,7 +21,7 @@ int main() {
         if(Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
             throw Game::SDLError(Mix_GetError());
         }
-        Game::sdl_info gs("Letvetzi", "art/font.ttf");
+        Game::sdl_info gs("Letvetzi", "art/font.ttf", "art/background.ogg");
 
         gs.load_png("bg_star"      , "art/img/bg_star.png");
 

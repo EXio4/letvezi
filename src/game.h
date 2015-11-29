@@ -62,13 +62,13 @@ namespace Game {
             std::map<std::string, TextureInfo>  txts;
             std::map<FontID,TTF_Font*> fonts;
             std::map<std::string, Mix_Chunk*> sfx;
-
+            Mix_Music* music;
             /* std::string til I manage to stop being lazy */
         public:
             SDL_Window*   window        = NULL;
             SDL_Renderer* win_renderer  = NULL;
 
-            sdl_info(const char* game_name, std::string font_name, int fps_param=60) {
+            sdl_info(const char* game_name, std::string font_name, std::string bg_name, int fps_param=60) {
                 window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
                 if (window == NULL) { throw SDLError(); }
                 win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED );
@@ -76,11 +76,14 @@ namespace Game {
                 fonts[Small]  = TTF_OpenFont(font_name.c_str(), 20);
                 fonts[Normal] = TTF_OpenFont(font_name.c_str(), 24);
                 fonts[Huge]   = TTF_OpenFont(font_name.c_str(), 32);
+                music = Mix_LoadMUS(bg_name.c_str());
+                Mix_PlayMusic(music, -1);
+                Mix_VolumeMusic(MIX_MAX_VOLUME / 4);
             }
             ~sdl_info() {
                 for (const auto& pair : txts) {
                     SDL_DestroyTexture(pair.second.texture);
-                }
+                };
                 SDL_DestroyWindow(window);
             }
 

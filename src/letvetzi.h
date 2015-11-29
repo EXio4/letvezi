@@ -871,7 +871,7 @@ namespace Letvetzi {
             Game::LSit render_GameMenu();
             Game::LSit render_Credits();
 
-            void render_pic(Position, std::string);
+            void render_pic(Position, std::string,uint8_t alpha=255);
             void render_background();
             void render_hud(const Hud&);
         };
@@ -965,14 +965,14 @@ namespace Letvetzi {
                 {Game::Huge  , "Credits"                         },
                 {Game::Normal, ""                                },
                 {Game::Huge  , "LETVEZI"                         },
-                {Game::Normal, ""                                },
                 {Game::Huge  , "Programming work and design"     },
                 {Game::Normal, "      Name1"                     },
                 {Game::Normal, "      Name2"                     },
                 {Game::Normal, "      Name3"                     },
                 {Game::Normal, ""                                },
                 {Game::Normal, "Art"                             },
-                {Game::Normal, "      Kenney (http://kenney.nl/)"}
+                {Game::Normal, "      Kenney  http://kenney.nl/" },
+                {Game::Normal, "      neocrey http://neocrey.com"}
             };
             for (auto& i : entries) {
                 hud.add_text(pos, txt_color, i.second, i.first);
@@ -1031,13 +1031,14 @@ namespace Letvetzi {
             return Game::KeepLooping;
         };
 
-        void Eng::render_pic(Position pos, std::string txt_name) {
+        void Eng::render_pic(Position pos, std::string txt_name, uint8_t alpha) {
             sdl_inf.with(txt_name, [&](Game::TextureInfo text) {
                 SDL_Rect r;
                 r.x = pos.x;
                 r.y = pos.y;
                 r.w = text.width;
                 r.h = text.height;
+                SDL_SetTextureAlphaMod(text.texture, alpha);
                 SDL_RenderCopy(sdl_inf.win_renderer, text.texture, NULL, &r);
             });
         };
@@ -1114,7 +1115,9 @@ namespace Letvetzi {
         void Player::extra_render(GameState::Type& gs, Game::sdl_info& sdl_inf, int fps_rel) {
             if (shield > 0) {
                 Render::Eng eng(sdl_inf, gs, fps_rel);
-                eng.render_pic(pos - Position(10,16), "player_shield");
+                int alpha = 255;
+                if (shield < 1000) alpha = shield/4;
+                eng.render_pic(pos - Position(10,16), "player_shield", alpha);
                 shield -= fps_rel;
             };
         };
