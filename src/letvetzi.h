@@ -467,24 +467,24 @@ namespace Letvetzi {
     namespace Entity {
 /*
             bool on_collision(GameState::Type&   , Player&         , Enemy&          );
-            bool on_collision(GameState::Type&   , Player&         , PlayerBullet&   );
-            bool on_collision(GameState::Type&   , Player&         , Player&         );
+            bool on_collision(GameState::Type&   , Player&         , PlayerBullet&   ); NOP
+            bool on_collision(GameState::Type&   , Player&         , Player&         ); NOP
             bool on_collision(GameState::Type&   , Player&         , EnemyBullet&    );
             bool on_collision(GameState::Type&   , Player&         , PowerUp&        );
             // enemy vs the world
             bool on_collision(GameState::Type&   , Enemy&          , Enemy&          );
-            bool on_collision(GameState::Type&   , Enemy&          , PlayerBullet&   );
-            bool on_collision(GameState::Type&   , Enemy&          , EnemyBullet&    );
-            bool on_collision(GameState::Type&   , Enemy&          , PowerUp&        );
+            bool on_collision(GameState::Type&   , Enemy&          , PlayerBullet&   ); 
+            bool on_collision(GameState::Type&   , Enemy&          , EnemyBullet&    ); NOP
+            bool on_collision(GameState::Type&   , Enemy&          , PowerUp&        ); NOP
             // player_bullet vs the world
-            bool on_collision(GameState::Type&   , PlayerBullet&   , PlayerBullet&   );
+            bool on_collision(GameState::Type&   , PlayerBullet&   , PlayerBullet&   ); NOP
             bool on_collision(GameState::Type&   , PlayerBullet&   , EnemyBullet&    );
             bool on_collision(GameState::Type&   , PlayerBullet&   , PowerUp&        );
             // enemy_bullet vs the world
-            bool on_collision(GameState::Type&   , EnemyBullet&    , EnemyBullet&    );
-            bool on_collision(GameState::Type&   , EnemyBullet&    , PowerUp&        );
+            bool on_collision(GameState::Type&   , EnemyBullet&    , EnemyBullet&    ); NOP
+            bool on_collision(GameState::Type&   , EnemyBullet&    , PowerUp&        ); NOP
             // power up vs the world
-            bool on_collision(GameState::Type&   , PowerUp&        , PowerUp&        );
+            bool on_collision(GameState::Type&   , PowerUp&        , PowerUp&        ); NOP
  */
 
         bool Collision::on_collision(GameState::Type&, Player&, Player&) {
@@ -526,6 +526,7 @@ namespace Letvetzi {
             return true;
         };
         bool Collision::on_collision(GameState::Type&, Player&, PowerUp&) {
+            // TODO: powerups
             return true;
         };
         bool Collision::on_collision(GameState::Type& gs, Player&, EnemyBullet& b) {
@@ -539,12 +540,14 @@ namespace Letvetzi {
             return true;
         };
 
-
         bool Collision::on_collision(GameState::Type& gs, Enemy& e, PlayerBullet& b) {
+            e.health -= 1;
             b.kill();
-            e.kill();
-            gs.add_enemy();
-            gs.maybe_add_enemy(0.05);
+            if (e.health <= 0) {
+                e.kill();
+                gs.add_enemy();
+                gs.maybe_add_enemy(0.05);
+            };
             gs.add_points(e.score);
             return true;
         };
