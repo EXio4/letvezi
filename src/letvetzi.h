@@ -594,7 +594,7 @@ namespace Letvetzi {
                         Entity::PowerUp *p = new Entity::PowerUp(Entity::PowerUp::Shield);
                         p->txt_name = "powerup_shield";
                         p->pos = e.pos;
-                        p->vel = Velocity(0, 25);
+                        p->vel = Velocity(0, 45);
                         return p;
                     });
                 });
