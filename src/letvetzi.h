@@ -422,13 +422,28 @@ namespace Letvetzi {
             };
 
             void start_boss(int boss_id) {
-                with_new_entity([&](Entity::Name) {
-                    Entity::Enemy *entity = new Entity::Enemy(500, 3+std::min(5,bullet_level)*boss_id, true);
-                    entity->pos = Position((res.width/2)-64, 48);
-                    entity->vel = Velocity(40,0);
-                    entity->txt_name = "enemy_boss";
-                    return static_cast<Entity::Type*>(entity);
-                });
+                for (int i=0; i<=(boss_id/2+1); i++) {
+                    double  p  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
+                    int pos = res.width / 4 + p * 2 * res.width/4;
+                    with_new_entity([&](Entity::Name) {
+                        Entity::Enemy *entity = new Entity::Enemy(500, 3+2*std::min(5,bullet_level)*boss_id, true);
+                        entity->pos = Position(pos, 48);
+                        entity->vel = Velocity(40,0);
+                        entity->txt_name = "enemy_boss";
+                        return static_cast<Entity::Type*>(entity);
+                    });
+                    for (int i=0; i<=(boss_id/5); i++) {
+                        double p = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
+                        int pos = res.width / 4 + p * 2 * res.width/4;
+                        with_new_entity([&](Entity::Name) {
+                            Entity::Enemy *entity = new Entity::Enemy(500, std::min(5,boss_id), true);
+                            entity->pos = Position(pos, 48 + 64);
+                            entity->vel = Velocity(20, 100);
+                            entity->txt_name = "enemy_boss_squad";
+                            return static_cast<Entity::Type*>(entity);
+                        });
+                    };
+                };
             };
             void maybe(double prob, std::function<void()> fn) {
                 double  p  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
@@ -444,7 +459,7 @@ namespace Letvetzi {
                 points += p;
                 til_boss -= p;
                 if (til_boss <= 0) {
-                    start_boss(p/boss_rate);
+                    start_boss(points/boss_rate);
                     til_boss = boss_rate;
                 };
             };
@@ -651,7 +666,15 @@ namespace Letvetzi {
             };
             void operator()(PlayerMove ev) const {
                 auto curr_vel = s.ent_mp[Entity::PlayerID()];
-                auto speed = Velocity(140, 0);
+                std::vector<int16_t> look {
+                    120,
+                    140,
+                    150,
+                    155,
+                    160,
+                    165
+                };
+                auto speed = Velocity(look[std::min(6, s.bullet_level)-1], 0);
                 auto zero  = Velocity(0,0);
                 switch (s.game_state) {
                     case GameState::Type::RestartGame:
@@ -880,7 +903,8 @@ namespace Letvetzi {
                     for (auto& other : s.ent_mp) {
                         if (other.first <= curr.first) continue; // we ignore ourselves (and previous checks)
                         if (other.second->killed)      continue; // we ignore dead entities
-                        if (curr.second->killed)  break;
+                        if (curr.second->killed)       break;    // ^ and this are used for avoiding extra `duplication`
+                               // x when more than entity collide with the same enemy or so
                         sdl_inf.with(other.second->txt_name, [&](Game::TextureInfo text2) {
                             SDL_Rect other_rect { other.second->pos.x, other.second->pos.y , text2.width , text2.height }; 
                             if (collide(&curr_rect, &other_rect)) {

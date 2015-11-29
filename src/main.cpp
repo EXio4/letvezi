@@ -35,6 +35,7 @@ int main() {
         gs.load_png("enemy_3"      , "art/img/enemy_3.png");
         gs.load_png("enemy_boss"   , "art/img/enemy_boss.png");
         gs.load_png("enemy_laser"  , "art/img/enemy_laser.png");
+        gs.load_png("enemy_boss_squad", "art/img/enemy_boss_squad.png");
 
         gs.load_png("powerup_shield", "art/img/powerup_shield.png");
         gs.load_png("powerup_bolt"  , "art/img/powerup_bolt.png");
