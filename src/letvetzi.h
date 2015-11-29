@@ -1,4 +1,6 @@
 #include <cstdint>
+#include <iostream>
+#include <fstream>
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <list>
@@ -10,6 +12,63 @@
 #include "game.h"
 
 namespace Letvetzi {
+    // 13 42 37 = letvezi things
+    uint32_t options_magic_num = 0x13423701;
+    std::string options_file = "options.dat";
+    struct Options {
+    private:
+        std::mutex m_;
+        SDL_Keycode space      = SDLK_SPACE;
+        SDL_Keycode left_key   = SDLK_LEFT;
+        SDL_Keycode right_key  = SDLK_RIGHT;
+        SDL_Keycode escape     = SDLK_ESCAPE;
+    public:
+        void modify(std::function<void(SDL_Keycode&,SDL_Keycode&, SDL_Keycode&, SDL_Keycode&)> fn) {
+                std::lock_guard<std::mutex> mlock(m_);
+                return fn(space, left_key, right_key, escape);
+        };
+        SDL_Keycode key_space() {
+            std::lock_guard<std::mutex> mlock(m_);
+            return space;
+        };
+        SDL_Keycode key_left() {
+            std::lock_guard<std::mutex> mlock(m_);
+            return left_key;
+        };
+        SDL_Keycode key_right() {
+            std::lock_guard<std::mutex> mlock(m_);
+            return right_key;
+        };
+        SDL_Keycode key_escape() {
+            std::lock_guard<std::mutex> mlock(m_);
+            return escape;
+        };
+
+        Options(std::string file_to_load) {
+            {
+                std::fstream fil(file_to_load.c_str(), std::ios::binary | std::ios::in);
+                uint32_t header;
+                fil.read((char*)&header, sizeof(header));
+                if (header != options_magic_num) throw ""; // TODO
+                fil.read((char*)&space    , sizeof(SDL_Keycode));
+                fil.read((char*)&left_key , sizeof(SDL_Keycode));
+                fil.read((char*)&right_key, sizeof(SDL_Keycode));
+                fil.read((char*)&escape   , sizeof(SDL_Keycode));
+            };
+        };
+        void save_to(std::string file) {
+            {
+                std::fstream fil(file.c_str(), std::ios::binary | std::ios::out);
+
+                fil.write((char*)&options_magic_num, sizeof(uint32_t));
+                fil.write((char*)&space    , sizeof(SDL_Keycode));
+                fil.write((char*)&left_key , sizeof(SDL_Keycode));
+                fil.write((char*)&right_key, sizeof(SDL_Keycode));
+                fil.write((char*)&escape   , sizeof(SDL_Keycode));
+
+            }
+        };
+    };
     struct VelocityT {
         typedef int16_t scalar;
     };
@@ -86,6 +145,16 @@ namespace Letvetzi {
                 virtual void out_of_screen(GameState::Type&) = 0;
         };
 
+        class PowerUp : public Type {
+        public:
+            enum Type {
+                Shield ,
+                Bolt   ,
+            } kind;
+            PowerUp(Type kind) : kind(kind) {};
+            void out_of_screen(GameState::Type&);
+        };
+
         class Player : public Type {
             public:
                 Player(Position pos_, Velocity vel_) {
@@ -102,11 +171,19 @@ namespace Letvetzi {
                 void out_of_screen(GameState::Type&);
 
         };
+
         class Enemy : public Type {
             public:
                 int score = 100;
-                Enemy(int score) : score(score) {};
+                int health = 1;
+                Enemy(int score, int health) : score(score), health(health) {};
                 Enemy() {};
+                void out_of_screen(GameState::Type&);
+        };
+
+        class EnemyBullet : public Type {
+            public:
+                EnemyBullet() {};
                 void out_of_screen(GameState::Type&);
         };
 
@@ -122,6 +199,10 @@ namespace Letvetzi {
                         return on_collision(gs, *x_, *y_);
                     } else if (auto y_ = dynamic_cast<Player*>(y)) {
                         return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<EnemyBullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<PowerUp*>(y)) {
+                        return on_collision(gs, *x_, *y_);
                     };
                 } else if (auto x_ = dynamic_cast<PlayerBullet*>(x)) {
                     if (auto y_ = dynamic_cast<Enemy*>(y)) {
@@ -129,6 +210,10 @@ namespace Letvetzi {
                     } else if (auto y_ = dynamic_cast<PlayerBullet*>(y)) {
                         return on_collision(gs, *x_, *y_);
                     } else if (auto y_ = dynamic_cast<Player*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<EnemyBullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<PowerUp*>(y)) {
                         return on_collision(gs, *x_, *y_);
                     };
                 } else if (auto x_ = dynamic_cast<Player*>(x)) {
@@ -138,21 +223,70 @@ namespace Letvetzi {
                         return on_collision(gs, *x_, *y_);
                     } else if (auto y_ = dynamic_cast<Player*>(y)) {
                         return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<EnemyBullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<PowerUp*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    };
+                } else if (auto x_ = dynamic_cast<EnemyBullet*>(x)) {
+                    if (auto y_ = dynamic_cast<Enemy*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<PlayerBullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<Player*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<EnemyBullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<PowerUp*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    };
+                } else if (auto x_ = dynamic_cast<PowerUp*>(x)) {
+                    if (auto y_ = dynamic_cast<Enemy*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<PlayerBullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<Player*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<EnemyBullet*>(y)) {
+                        return on_collision(gs, *x_, *y_);
+                    } else if (auto y_ = dynamic_cast<PowerUp*>(y)) {
+                        return on_collision(gs, *x_, *y_);
                     };
                 }
                 return false;
             };
 
-            bool on_collision(GameState::Type&, Enemy&        , Enemy&       );
-            bool on_collision(GameState::Type&, Enemy&        , PlayerBullet&);
-            bool on_collision(GameState::Type&, Enemy&        , Player&      );
-            bool on_collision(GameState::Type&, PlayerBullet& , Enemy&       );
-            bool on_collision(GameState::Type&, PlayerBullet& , PlayerBullet&);
-            bool on_collision(GameState::Type&, PlayerBullet& , Player&      );
-            bool on_collision(GameState::Type&, Player&       , Enemy&       );
-            bool on_collision(GameState::Type&, Player&       , PlayerBullet&);
-            bool on_collision(GameState::Type&, Player&       , Player&      );
-
+            // player vs the world
+            bool on_collision(GameState::Type&   , Player&         , Enemy&          );
+            bool on_collision(GameState::Type&   , Player&         , PlayerBullet&   );
+            bool on_collision(GameState::Type&   , Player&         , Player&         );
+            bool on_collision(GameState::Type&   , Player&         , EnemyBullet&    );
+            bool on_collision(GameState::Type&   , Player&         , PowerUp&        );
+            // enemy vs the world
+            bool on_collision(GameState::Type&   , Enemy&          , Enemy&          );
+            bool on_collision(GameState::Type&   , Enemy&          , PlayerBullet&   );
+            bool on_collision(GameState::Type& g , Enemy&        x , Player&       y ) { return on_collision(g,y,x); };
+            bool on_collision(GameState::Type&   , Enemy&          , EnemyBullet&    );
+            bool on_collision(GameState::Type&   , Enemy&          , PowerUp&        );
+            // player_bullet vs the world
+            bool on_collision(GameState::Type& g , PlayerBullet& x , Enemy&        y ) { return on_collision(g,y,x); };
+            bool on_collision(GameState::Type&   , PlayerBullet&   , PlayerBullet&   );
+            bool on_collision(GameState::Type& g , PlayerBullet& x , Player&       y ) { return on_collision(g,y,x); };
+            bool on_collision(GameState::Type&   , PlayerBullet&   , EnemyBullet&    );
+            bool on_collision(GameState::Type&   , PlayerBullet&   , PowerUp&        );
+            // enemy_bullet vs the world
+            bool on_collision(GameState::Type& g , EnemyBullet&  x , Enemy&        y ) { return on_collision(g,y,x); };
+            bool on_collision(GameState::Type& g , EnemyBullet&  x , PlayerBullet& y ) { return on_collision(g,y,x); };
+            bool on_collision(GameState::Type& g , EnemyBullet&  x , Player&       y ) { return on_collision(g,y,x); };
+            bool on_collision(GameState::Type&   , EnemyBullet&    , EnemyBullet&    );
+            bool on_collision(GameState::Type&   , EnemyBullet&    , PowerUp&        );
+            // power up vs the world
+            bool on_collision(GameState::Type& g , PowerUp&      x , Enemy&        y ) { return on_collision(g,y,x); };
+            bool on_collision(GameState::Type& g , PowerUp&      x , PlayerBullet& y ) { return on_collision(g,y,x); };
+            bool on_collision(GameState::Type& g , PowerUp&      x , Player&       y ) { return on_collision(g,y,x); };
+            bool on_collision(GameState::Type& g , PowerUp&      x , EnemyBullet&  y ) { return on_collision(g,y,x); };
+            bool on_collision(GameState::Type&   , PowerUp&        , PowerUp&        );
+            // fuck up, this is a lot of boilerplate
         } collision;
     };
 
@@ -232,19 +366,19 @@ namespace Letvetzi {
                     x = std::min<int16_t>(x, res.width - 100);
                     // we reuse the random number generator of the bg_particles, TODO: rename it
                     if (type > 0.9) {
-                        Entity::Enemy *entity = new Entity::Enemy(300);
+                        Entity::Enemy *entity = new Entity::Enemy(300, 2);
                         entity->pos = Position(x, 2);
                         entity->vel = Velocity(0,55);
                         entity->txt_name = "enemy_3";
                         return static_cast<Entity::Type*>(entity);
                     } else if (type > 0.4) {
-                        Entity::Enemy *entity = new Entity::Enemy(200);
+                        Entity::Enemy *entity = new Entity::Enemy(200, 1);
                         entity->pos = Position(x, 2);
                         entity->vel = Velocity(0,45);
                         entity->txt_name = "enemy_2";
                         return static_cast<Entity::Type*>(entity);
                     } else {
-                        Entity::Enemy *entity = new Entity::Enemy(100);
+                        Entity::Enemy *entity = new Entity::Enemy(100, 1);
                         entity->pos = Position(x, 5);
                         entity->vel = Velocity(0,35);
                         entity->txt_name = "enemy_1";
@@ -277,12 +411,11 @@ namespace Letvetzi {
                         menu.opts.push_back(MenuOption{"Start Game",[](GameState::Type& s) {
                                                 s.game_state = Running;
                                             }});
-                        menu.opts.push_back(MenuOption{"Credits",[&](GameState::Type& s) {
-                                                s.credit_text_pos = Position(s.res.width/4, res.height + 32);
-                                                s.game_state = Credits;
+                        menu.opts.push_back(MenuOption{"Credits",[](GameState::Type& s) {
+                                                s.show_credits();
                                             }});
                         menu.opts.push_back(MenuOption{"Quit Game", [](GameState::Type& s) {
-                                                s.game_state = QuitGame;
+                                                s.quit_game();
                                             }});
                     });
                 };
@@ -291,9 +424,21 @@ namespace Letvetzi {
                 ent_mp.clear();
                 last_entity = Entity::Name(1);
                 ent_mp[Entity::PlayerID()] = std::shared_ptr<Entity::Type>(new Entity::Player(player_original, vel));
-                for (int i=0; i<5; i++) {
+                for (int i=0; i<3; i++) {
                     add_enemy();
                 };
+                maybe_add_enemy(0.5);
+                maybe_add_enemy(0.25);
+                maybe_add_enemy(0.1);
+            };
+
+            void quit_game() {
+                game_state = QuitGame;
+            };
+
+            void show_credits() {
+                game_state = Credits;
+                credit_text_pos = Position(res.width/4, res.height + 32);
             };
 
             void with_menu(std::function<void(Menu&)> fn) {
@@ -312,21 +457,67 @@ namespace Letvetzi {
             void add_points(uint32_t p) {
                 points += p;
             };
+            void add_life(unsigned int li) {
+                lives += li;
+                if (lives == 0) game_state = GameState::Type::GameOver;
+            };
         };
     }
 
     namespace Entity {
-        bool Collision::on_collision(GameState::Type& gs, Enemy& e, PlayerBullet& b) {
-                    return Collision::on_collision(gs, b, e);
+/*
+            bool on_collision(GameState::Type&   , Player&         , Enemy&          );
+            bool on_collision(GameState::Type&   , Player&         , PlayerBullet&   );
+            bool on_collision(GameState::Type&   , Player&         , Player&         );
+            bool on_collision(GameState::Type&   , Player&         , EnemyBullet&    );
+            bool on_collision(GameState::Type&   , Player&         , PowerUp&        );
+            // enemy vs the world
+            bool on_collision(GameState::Type&   , Enemy&          , Enemy&          );
+            bool on_collision(GameState::Type&   , Enemy&          , PlayerBullet&   );
+            bool on_collision(GameState::Type&   , Enemy&          , EnemyBullet&    );
+            bool on_collision(GameState::Type&   , Enemy&          , PowerUp&        );
+            // player_bullet vs the world
+            bool on_collision(GameState::Type&   , PlayerBullet&   , PlayerBullet&   );
+            bool on_collision(GameState::Type&   , PlayerBullet&   , EnemyBullet&    );
+            bool on_collision(GameState::Type&   , PlayerBullet&   , PowerUp&        );
+            // enemy_bullet vs the world
+            bool on_collision(GameState::Type&   , EnemyBullet&    , EnemyBullet&    );
+            bool on_collision(GameState::Type&   , EnemyBullet&    , PowerUp&        );
+            // power up vs the world
+            bool on_collision(GameState::Type&   , PowerUp&        , PowerUp&        );
+ */
+
+        bool Collision::on_collision(GameState::Type&, Player&, Player&) {
+            return false;
         };
-        bool Collision::on_collision(GameState::Type& gs, PlayerBullet& b, Enemy& e) {
-            b.kill();
-            e.kill();
-            gs.add_enemy();
-            gs.maybe_add_enemy(0.05);
-            gs.add_points(e.score);
-            return true;
+        bool Collision::on_collision(GameState::Type&, Player&, PlayerBullet&) {
+            return false;
         };
+        bool Collision::on_collision(GameState::Type&, Enemy&, Enemy&) {
+            return false;
+        };
+        bool Collision::on_collision(GameState::Type&, Enemy&, EnemyBullet&) {
+            return false;
+        };
+        bool Collision::on_collision(GameState::Type&, Enemy&, PowerUp&) {
+            return false;
+        };
+        bool Collision::on_collision(GameState::Type&, PlayerBullet&,  PlayerBullet&) {
+            return false;
+        };
+        bool Collision::on_collision(GameState::Type&, EnemyBullet&,  EnemyBullet&) {
+            return false;
+        };
+        bool Collision::on_collision(GameState::Type&, EnemyBullet&,  PowerUp&) {
+            return false;
+        };
+        bool Collision::on_collision(GameState::Type&, PowerUp&,  PowerUp&) {
+            return false;
+        };
+        bool Collision::on_collision(GameState::Type&, PlayerBullet&,  PowerUp&) {
+            return false;
+        };
+
         bool Collision::on_collision(GameState::Type& gs, Player&, Enemy& e) {
             // TODO: balance tweaks, suggestions for this?
             e.kill();
@@ -334,33 +525,44 @@ namespace Letvetzi {
             gs.add_enemy();
             return true;
         };
-        bool Collision::on_collision(GameState::Type& gs, Enemy& e, Player& p) {
-            return on_collision(gs, p, e);
+        bool Collision::on_collision(GameState::Type&, Player&, PowerUp&) {
+            return true;
         };
-        bool Collision::on_collision(GameState::Type&, PlayerBullet&, Player&) {
-            return false;
+        bool Collision::on_collision(GameState::Type& gs, Player&, EnemyBullet& b) {
+            gs.add_life(-1);
+            b.kill();
+            return true;
         };
-        bool Collision::on_collision(GameState::Type&, Player&, PlayerBullet&) {
-            return false;
+
+        bool Collision::on_collision(GameState::Type&, PlayerBullet&, EnemyBullet& b) {
+            b.kill();
+            return true;
         };
-        bool Collision::on_collision(GameState::Type&, PlayerBullet&, PlayerBullet&) {
-            return false;
+
+
+        bool Collision::on_collision(GameState::Type& gs, Enemy& e, PlayerBullet& b) {
+            b.kill();
+            e.kill();
+            gs.add_enemy();
+            gs.maybe_add_enemy(0.05);
+            gs.add_points(e.score);
+            return true;
         };
-        bool Collision::on_collision(GameState::Type&, Enemy&, Enemy&) {
-            return false;
-        };
-        bool Collision::on_collision(GameState::Type&, Player&, Player&) {
-            return false;
-        };
+
         void PlayerBullet::out_of_screen(GameState::Type&) {
+            this->kill();
+        };
+        void EnemyBullet::out_of_screen(GameState::Type&) {
+            this->kill();
+        };
+        void PowerUp::out_of_screen(GameState::Type&) {
             this->kill();
         };
         void Enemy::out_of_screen(GameState::Type& gs) {
             this->kill();
             gs.add_enemy();
             gs.maybe_add_enemy(0.02);
-            gs.lives--;
-            if (gs.lives == 0) gs.game_state = GameState::Type::GameOver;
+            gs.add_life(-1);
         };
     }
 
@@ -473,8 +675,11 @@ namespace Letvetzi {
                             menu.opts.push_back(GameState::MenuOption{"Continue playing", [](GameState::Type& s) {
                                 s.game_state = GameState::Type::Running;
                             }});
+                            menu.opts.push_back(GameState::MenuOption{"Credits",[](GameState::Type& s) {
+                                s.show_credits();
+                            }});
                             menu.opts.push_back(GameState::MenuOption{"Quit game", [](GameState::Type& s) {
-                                s.game_state = GameState::Type::QuitGame;
+                                s.quit_game();
                             }});
                         });
                     break;
@@ -738,7 +943,7 @@ namespace Letvetzi {
                 SDL_Color other_option   {0,   0, 255, 255};
                 // TODO: see how we could deal with the menu w/o using a normal loop
                 // and still have an easy way to select the next/prev menu entry easily
-                Position pos(32, hud.start_hud + 128); // start pos
+                Position pos(128, hud.start_hud + 128); // start pos
                 for (uint16_t i=0; i<s.menu.opts.size(); i++) {
                     auto c = s.menu.opts[i];
                     if (i == s.menu.current) {
@@ -755,7 +960,7 @@ namespace Letvetzi {
                     } else {
                             hud.add_text(pos, other_option,   c.text);
                     };
-                    pos += Position(c.text.length() * 32 ,0);
+                    pos += Position(c.text.length() * (16+8) ,0);
                 };
                 render_hud(hud);
             };

@@ -75,7 +75,7 @@ namespace Game {
                 fonts[Huge]   = TTF_OpenFont(font_name.c_str(), 32);
             }
             ~sdl_info() {
-                for (const auto &pair : txts) {
+                for (const auto& pair : txts) {
                     SDL_DestroyTexture(pair.second.texture);
                 }
                 SDL_DestroyWindow(window);

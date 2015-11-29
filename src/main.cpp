@@ -20,15 +20,20 @@ int main() {
         if (TTF_Init() < 0) { throw Game::SDLError(TTF_GetError()); }
         Game::sdl_info gs("Letvetzi", "art/font.ttf");
 
-        gs.load_png("bg_star"     , "art/bg_star.png");
+        gs.load_png("bg_star"      , "art/bg_star.png");
 
-        gs.load_png("player"      , "art/player.png");
-        gs.load_png("player_laser", "art/player_laser.png");
-        gs.load_png("player_life" , "art/player_life.png");
+        gs.load_png("player"       , "art/player.png");
+        gs.load_png("player_laser" , "art/player_laser.png");
+        gs.load_png("player_life"  , "art/player_life.png");
+        gs.load_png("player_shield", "art/player_shield.png");
 
-        gs.load_png("enemy_1"     , "art/enemy_1.png");
-        gs.load_png("enemy_2"     , "art/enemy_2.png");
-        gs.load_png("enemy_3"     , "art/enemy_3.png");
+        gs.load_png("enemy_1"      , "art/enemy_1.png");
+        gs.load_png("enemy_2"      , "art/enemy_2.png");
+        gs.load_png("enemy_3"      , "art/enemy_3.png");
+        gs.load_png("enemy_laser"  , "art/enemy_laser.png");
+
+        gs.load_png("powerup_shield", "art/powerup_shield.png");
+        gs.load_png("powerup_weapon", "art/powerup_weapon.png");
 
         Game::Resolution res = gs.get_current_res();
         Letvetzi::GameState::Type start_state =
