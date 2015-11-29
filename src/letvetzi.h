@@ -322,6 +322,7 @@ namespace Letvetzi {
             public:
             uint64_t       points  = 0;
             unsigned int   lives   = 10;
+            int            bullet_level = 1;
             int            til_boss = boss_rate;
             enum Current {
                 Running      ,
@@ -382,21 +383,21 @@ namespace Letvetzi {
                     x = std::min<int16_t>(x, res.width - 100);
                     // we reuse the random number generator of the bg_particles, TODO: rename it
                     if (type > 0.9) {
-                        Entity::Enemy *entity = new Entity::Enemy(300, 2);
+                        Entity::Enemy *entity = new Entity::Enemy(300, 2 + 0.5 * bullet_level);
                         entity->pos = Position(x, 2);
-                        entity->vel = Velocity(0,55);
+                        entity->vel = Velocity(0,55 - bullet_level * 1.5);
                         entity->txt_name = "enemy_3";
                         return static_cast<Entity::Type*>(entity);
                     } else if (type > 0.4) {
-                        Entity::Enemy *entity = new Entity::Enemy(200, 1);
+                        Entity::Enemy *entity = new Entity::Enemy(200, 1 + 0.35 * bullet_level);
                         entity->pos = Position(x, 2);
-                        entity->vel = Velocity(0,45);
+                        entity->vel = Velocity(0,45 - bullet_level * 1);
                         entity->txt_name = "enemy_2";
                         return static_cast<Entity::Type*>(entity);
                     } else {
-                        Entity::Enemy *entity = new Entity::Enemy(100, 1);
+                        Entity::Enemy *entity = new Entity::Enemy(100, 1 + 0.25 * bullet_level);
                         entity->pos = Position(x, 5);
-                        entity->vel = Velocity(0,35);
+                        entity->vel = Velocity(0,35 - bullet_level * 0.75);
                         entity->txt_name = "enemy_1";
                         return static_cast<Entity::Type*>(entity);
                     } 
@@ -409,14 +410,24 @@ namespace Letvetzi {
             };
 
             void add_bullet(Velocity vel) {
-                with_new_entity([&](Entity::Name) {
-                    Entity::PlayerBullet *entity = new Entity::PlayerBullet();
-                    entity->pos        = ent_mp[Entity::PlayerID()]->pos;
-                    entity->pos.x     += 46;
-                    entity->txt_name   = "player_laser";
-                    entity->vel        = vel;
-                    return entity;
-                });
+                int mx = std::min<int>(4,bullet_level);
+                std::vector<int16_t> mp {
+                                    00,
+                                    30,
+                                    60,
+                                    90,
+                                    120
+                                };
+                for (int i=1; i <= mx; i++) {
+                    with_new_entity([&](Entity::Name) {
+                        Entity::PlayerBullet *entity = new Entity::PlayerBullet();
+                        entity->pos        = ent_mp[Entity::PlayerID()]->pos;
+                        entity->pos.x     += mp[i];
+                        entity->txt_name   = "player_laser";
+                        entity->vel        = vel;
+                        return entity;
+                    });
+                };
                 sdl_inf->play_sfx("player_laser");
             }
             void restart_game(bool first=false) {
@@ -438,6 +449,7 @@ namespace Letvetzi {
                 };
                 points = 0;
                 lives  = 10;
+                bullet_level = 1;
                 ent_mp.clear();
                 last_entity = Entity::Name(1);
                 ent_mp[Entity::PlayerID()] = std::shared_ptr<Entity::Type>(new Entity::Player(player_original, vel));
@@ -468,7 +480,7 @@ namespace Letvetzi {
 
             void start_boss(int boss_id) {
                 with_new_entity([&](Entity::Name) {
-                    Entity::Enemy *entity = new Entity::Enemy(300, 3+boss_id, true);
+                    Entity::Enemy *entity = new Entity::Enemy(500, 3+std::min(5,bullet_level)*boss_id, true);
                     entity->pos = Position((res.width/2)-64, 48);
                     entity->vel = Velocity(40,0);
                     entity->txt_name = "enemy_boss";
@@ -559,7 +571,7 @@ namespace Letvetzi {
             e.kill();
             if (!p.shield) {
                 gs.add_life(-1);
-                gs.add_enemy();
+                gs.maybe_add_enemy(0.05);
             };
             gs.add_enemy();
             return true;
@@ -569,7 +581,9 @@ namespace Letvetzi {
             if (pup.kind == PowerUp::Shield) {
                 gs.sdl_inf->play_sfx("shield_enabled");
                 pl.shield += 5000;
-            };
+            } else if (pup.kind == PowerUp::Bolt) {
+                gs.bullet_level++;
+            }
             pup.kill();
             return true;
         };
@@ -598,6 +612,15 @@ namespace Letvetzi {
                         Entity::PowerUp *p = new Entity::PowerUp(Entity::PowerUp::Shield);
                         p->txt_name = "powerup_shield";
                         p->pos = e.pos;
+                        p->vel = Velocity(0, 45);
+                        return p;
+                    });
+                });
+                gs.maybe(0.10, [&]() {
+                    gs.with_new_entity([&](Entity::Name) {
+                        Entity::PowerUp *p = new Entity::PowerUp(Entity::PowerUp::Bolt);
+                        p->txt_name = "powerup_bolt";
+                        p->pos = e.pos + Position(0,40);
                         p->vel = Velocity(0, 45);
                         return p;
                     });
@@ -667,6 +690,7 @@ namespace Letvetzi {
             void operator()(Shoot ev) const {
                 switch (s.game_state) {
                     case GameState::Type::Running:
+                        ev.vel = (1 + 0.4 * std::min(5,s.bullet_level)) * ev.vel;
                         s.add_bullet(ev.vel);
                     break;
                     case GameState::Type::GameOver:
@@ -784,7 +808,7 @@ namespace Letvetzi {
                             }
                         }
                         switch(ev.key.keysym.sym) {
-                            case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(200)));
+                            case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(150)));
                                              break;
                         }
                         break;
@@ -907,10 +931,13 @@ namespace Letvetzi {
 
             // collision detection
             for (auto& curr : s.ent_mp) {
+                if (curr.second->killed) continue;
                 sdl_inf.with(curr.second->txt_name, [&](Game::TextureInfo text) {
                     SDL_Rect curr_rect { curr.second->pos.x, curr.second->pos.y , text.width, text.height };
                     for (auto& other : s.ent_mp) {
-                        if (other.first <= curr.first) continue; // we ignore ourselves (and previous checks)   
+                        if (other.first <= curr.first) continue; // we ignore ourselves (and previous checks)
+                        if (other.second->killed)      continue; // we ignore dead entities
+                        if (curr.second->killed)  break;
                         sdl_inf.with(other.second->txt_name, [&](Game::TextureInfo text2) {
                             SDL_Rect other_rect { other.second->pos.x, other.second->pos.y , text2.width , text2.height }; 
                             if (collide(&curr_rect, &other_rect)) {
