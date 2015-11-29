@@ -260,7 +260,7 @@ namespace Letvetzi {
                 current = (current + x) % opts.size();
             };
         };
-        int boss_rate = 15000;
+        int boss_rate = 25000;
         class Type {
             public:
             uint64_t       points  = 0;
@@ -422,7 +422,7 @@ namespace Letvetzi {
             };
 
             void start_boss(int boss_id) {
-                for (int i=0; i<=(boss_id/2+1); i++) {
+                for (int i=0; i<1+(boss_id/2); i++) {
                     double  p  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
                     int pos = res.width / 4 + p * 2 * res.width/4;
                     with_new_entity([&](Entity::Name) {
@@ -432,17 +432,17 @@ namespace Letvetzi {
                         entity->txt_name = "enemy_boss";
                         return static_cast<Entity::Type*>(entity);
                     });
-                    for (int i=0; i<=(boss_id/5); i++) {
-                        double p = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
-                        int pos = res.width / 4 + p * 2 * res.width/4;
-                        with_new_entity([&](Entity::Name) {
-                            Entity::Enemy *entity = new Entity::Enemy(500, std::min(5,boss_id), true);
-                            entity->pos = Position(pos, 48 + 64);
-                            entity->vel = Velocity(20, 100);
-                            entity->txt_name = "enemy_boss_squad";
-                            return static_cast<Entity::Type*>(entity);
-                        });
-                    };
+                };
+                for (int i=0; i<1+(boss_id/5); i++) {
+                    double p = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
+                    int pos = res.width / 4 + p * 2 * res.width/4;
+                    with_new_entity([&](Entity::Name) {
+                        Entity::Enemy *entity = new Entity::Enemy(500, std::min(5,boss_id), true);
+                        entity->pos = Position(pos, 48 + 64);
+                        entity->vel = Velocity(20, 100);
+                        entity->txt_name = "enemy_boss_squad";
+                        return static_cast<Entity::Type*>(entity);
+                    });
                 };
             };
             void maybe(double prob, std::function<void()> fn) {
@@ -942,7 +942,7 @@ namespace Letvetzi {
                 SDL_Color game_over_c = {255, 0, 0, 255};
                 hud.add_text(48, s.res.height - 100, game_over_c, "GAME OVER");
                 SDL_Color game_over_c2 = {0,0,255,255};
-                hud.add_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to restart");
+                hud.add_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to go back to the main menu");
                 render_hud(hud);
             };
             return Game::KeepLooping;
@@ -1019,6 +1019,8 @@ namespace Letvetzi {
                     };
                     pos += Position(c.text.length() * (16+8) ,0);
                 };
+                hud.add_text(Position(s.res.width - (512+256) , hud.start_hud + 256     ), pressed_option, "Left/Right keys = Move between options");
+                hud.add_text(Position(s.res.width - (512+256) , hud.start_hud + 256 + 32), pressed_option, "Space key       = Select current option");
                 render_hud(hud);
             };
             return Game::KeepLooping;
