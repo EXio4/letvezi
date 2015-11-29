@@ -335,6 +335,7 @@ namespace Letvetzi {
             Game::Resolution res;
             Position credit_text_pos = Position(32,60);
             Position player_original;
+            Game::sdl_info* sdl_inf;
             std::list<Particle> bg_particles;
             struct {
                 std::default_random_engine random_eng;
@@ -344,8 +345,8 @@ namespace Letvetzi {
             } bg_particles_gen;
             std::map<Entity::Name,std::shared_ptr<Entity::Type>> ent_mp;
             Entity::Name last_entity = Entity::Name(1);
-            Type(Game::Resolution res_p, Position player_p)
-               : res(res_p), player_original(player_p) {
+            Type(Game::Resolution res_p, Position player_p, Game::sdl_info* sdl_inf)
+               : res(res_p), player_original(player_p), sdl_inf(sdl_inf) {
                 { std::random_device rd;
                   std::default_random_engine r_eg(rd());;
                   std::uniform_int_distribution<int16_t> start_pos(0, res.width); // start positions \x -> (x,0)
@@ -416,6 +417,7 @@ namespace Letvetzi {
                     entity->vel        = vel;
                     return entity;
                 });
+                sdl_inf->play_sfx("player_laser");
             }
             void restart_game(bool first=false) {
                 Velocity vel = Velocity(0,0);
@@ -563,9 +565,12 @@ namespace Letvetzi {
             gs.add_enemy();
             return true;
         };
-        bool Collision::on_collision(GameState::Type&, Player& pl, PowerUp& pup) {
+        bool Collision::on_collision(GameState::Type& gs, Player& pl, PowerUp& pup) {
             // TODO: powerups
-            if (pup.kind == PowerUp::Shield) pl.shield += 5000;
+            if (pup.kind == PowerUp::Shield) {
+                gs.sdl_inf->play_sfx("shield_enabled");
+                pl.shield += 5000;
+            };
             pup.kill();
             return true;
         };

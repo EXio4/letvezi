@@ -3,6 +3,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_mixer.h>
 #include <map>
 #include <thread>
 #include <mutex>
@@ -59,11 +60,13 @@ namespace Game {
     private:
             uint16_t fps = 60; /* fps >= 0 */
             std::map<std::string, TextureInfo>  txts;
+            std::map<FontID,TTF_Font*> fonts;
+            std::map<std::string, Mix_Chunk*> sfx;
+
             /* std::string til I manage to stop being lazy */
         public:
             SDL_Window*   window        = NULL;
             SDL_Renderer* win_renderer  = NULL;
-            std::map<FontID,TTF_Font*> fonts;
 
             sdl_info(const char* game_name, std::string font_name, int fps_param=60) {
                 window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
@@ -100,6 +103,14 @@ namespace Game {
                  SDL_QueryTexture(texture, NULL, NULL, &(inf.width), &(inf.height));
                  inf.texture = texture;
             }
+
+            void load_sfx(std::string key, std::string path) {
+                sfx[key] = Mix_LoadWAV(path.c_str());
+            };
+
+            void play_sfx(std::string key) {
+                Mix_PlayChannel(-1, sfx[key], 0);
+            };
 
             void render_text(int x, int y, FontID f_id, SDL_Color txt_color, std::string text) {
                 SDL_Rect  pos;

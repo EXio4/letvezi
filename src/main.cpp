@@ -18,28 +18,35 @@ int main() {
           if(!(IMG_Init(imgFlags) & imgFlags)) { throw Game::SDLError(IMG_GetError()); }
         }
         if (TTF_Init() < 0) { throw Game::SDLError(TTF_GetError()); }
+        if(Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+            throw Game::SDLError(Mix_GetError());
+        }
         Game::sdl_info gs("Letvetzi", "art/font.ttf");
 
-        gs.load_png("bg_star"      , "art/bg_star.png");
+        gs.load_png("bg_star"      , "art/img/bg_star.png");
 
-        gs.load_png("player"       , "art/player.png");
-        gs.load_png("player_laser" , "art/player_laser.png");
-        gs.load_png("player_life"  , "art/player_life.png");
-        gs.load_png("player_shield", "art/player_shield.png");
+        gs.load_png("player"       , "art/img/player.png");
+        gs.load_png("player_laser" , "art/img/player_laser.png");
+        gs.load_png("player_life"  , "art/img/player_life.png");
+        gs.load_png("player_shield", "art/img/player_shield.png");
 
-        gs.load_png("enemy_1"      , "art/enemy_1.png");
-        gs.load_png("enemy_2"      , "art/enemy_2.png");
-        gs.load_png("enemy_3"      , "art/enemy_3.png");
-        gs.load_png("enemy_boss"   , "art/enemy_boss.png");
-        gs.load_png("enemy_laser"  , "art/enemy_laser.png");
+        gs.load_png("enemy_1"      , "art/img/enemy_1.png");
+        gs.load_png("enemy_2"      , "art/img/enemy_2.png");
+        gs.load_png("enemy_3"      , "art/img/enemy_3.png");
+        gs.load_png("enemy_boss"   , "art/img/enemy_boss.png");
+        gs.load_png("enemy_laser"  , "art/img/enemy_laser.png");
 
-        gs.load_png("powerup_shield", "art/powerup_shield.png");
-        gs.load_png("powerup_bolt"  , "art/powerup_bolt.png");
+        gs.load_png("powerup_shield", "art/img/powerup_shield.png");
+        gs.load_png("powerup_bolt"  , "art/img/powerup_bolt.png");
+
+        gs.load_sfx("player_laser" , "art/sfx/player_laser.ogg");
+        gs.load_sfx("shield_enabled", "art/sfx/player_laser.ogg");
 
         Game::Resolution res = gs.get_current_res();
         Letvetzi::GameState::Type start_state =
                    Letvetzi::GameState::Type(res,
-                            Letvetzi::Position(res.width/2, res.height-70-gs.textures().at("player").height));
+                            Letvetzi::Position(res.width/2, res.height-70-gs.textures().at("player").height),
+                                &gs);
 
         std::function<void(Conc::Chan<SDL_Event>&,Conc::Chan<Letvetzi::Events::Type>&)> event_fn =
                 Letvetzi::event_handler;
