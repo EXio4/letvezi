@@ -267,6 +267,9 @@ namespace Letvetzi {
             unsigned int   lives   = 10;
             int            bullet_level = 1;
             int            til_boss = boss_rate;
+            int            bosses_killed = 0;
+            bool           shooting = false;
+            int            shoot_tempo = -1;
             enum Current {
                 Running      ,
                 GameOver     ,
@@ -322,25 +325,26 @@ namespace Letvetzi {
                 with_new_entity([&](Entity::Name) {
                     int16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
                     double  type  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
+                    int bullet_rel = std::min(bullet_level * 2, 45);
                     // we don't let enemies spawn too past
                     x = std::min<int16_t>(x, res.width - 100);
                     // we reuse the random number generator of the bg_particles, TODO: rename it
                     if (type > 0.9) {
                         Entity::Enemy *entity = new Entity::Enemy(300, 2 + 0.5 * bullet_level);
                         entity->pos = Position(x, 2);
-                        entity->vel = Velocity(0,55 - bullet_level * 1.5);
+                        entity->vel = Velocity(0,55 + bullet_rel);
                         entity->txt_name = "enemy_3";
                         return static_cast<Entity::Type*>(entity);
                     } else if (type > 0.4) {
                         Entity::Enemy *entity = new Entity::Enemy(200, 1 + 0.35 * bullet_level);
                         entity->pos = Position(x, 2);
-                        entity->vel = Velocity(0,45 - bullet_level * 1);
+                        entity->vel = Velocity(0,50 + bullet_rel);
                         entity->txt_name = "enemy_2";
                         return static_cast<Entity::Type*>(entity);
                     } else {
                         Entity::Enemy *entity = new Entity::Enemy(100, 1 + 0.25 * bullet_level);
                         entity->pos = Position(x, 5);
-                        entity->vel = Velocity(0,35 - bullet_level * 0.75);
+                        entity->vel = Velocity(0,40 + bullet_rel);
                         entity->txt_name = "enemy_1";
                         return static_cast<Entity::Type*>(entity);
                     } 
@@ -393,6 +397,8 @@ namespace Letvetzi {
                 points = 0;
                 lives  = 10;
                 bullet_level = 1;
+                til_boss = boss_rate;
+                bosses_killed = 0;
                 ent_mp.clear();
                 last_entity = Entity::Name(1);
                 ent_mp[Entity::PlayerID()] = std::shared_ptr<Entity::Type>(new Entity::Player(player_original, vel));
@@ -422,7 +428,7 @@ namespace Letvetzi {
             };
 
             void start_boss(int boss_id) {
-                for (int i=0; i<1+(boss_id/2); i++) {
+                for (int i=0; i<1+(boss_id/5); i++) {
                     double  p  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
                     int pos = res.width / 4 + p * 2 * res.width/4;
                     with_new_entity([&](Entity::Name) {
@@ -433,7 +439,7 @@ namespace Letvetzi {
                         return static_cast<Entity::Type*>(entity);
                     });
                 };
-                for (int i=0; i<1+(boss_id/5); i++) {
+                for (int i=0; i<1+(boss_id * 2); i++) {
                     double p = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
                     int pos = res.width / 4 + p * 2 * res.width/4;
                     with_new_entity([&](Entity::Name) {
@@ -459,8 +465,8 @@ namespace Letvetzi {
                 points += p;
                 til_boss -= p;
                 if (til_boss <= 0) {
-                    start_boss(points/boss_rate);
-                    til_boss = boss_rate;
+                    start_boss(1 + bosses_killed);
+                    til_boss = (1 + bosses_killed) * boss_rate;
                 };
             };
             void add_life(unsigned int li) {
@@ -527,7 +533,7 @@ namespace Letvetzi {
         bool Collision::on_collision(GameState::Type& gs, Player& p, Enemy& e) {
             // TODO: balance tweaks, suggestions for this?
             e.kill();
-            if (!p.shield) {
+            if (p.shield <= 5) {
                 gs.add_life(-1);
                 gs.maybe_add_enemy(0.05);
             };
@@ -559,13 +565,17 @@ namespace Letvetzi {
         };
 
         bool Collision::on_collision(GameState::Type& gs, Enemy& e, PlayerBullet& b) {
-            e.health -= 1;
+            e.health -= ceil(gs.bullet_level);
             b.kill();
             if (e.health <= 0) {
                 e.kill();
-                gs.add_enemy();
-                gs.maybe_add_enemy(0.05);
-                gs.maybe(0.10, [&]() {
+                if (gs.ent_mp.size() < 50) {
+                    gs.add_enemy();
+                } else {
+                    gs.maybe_add_enemy(0.05);
+                };
+                gs.maybe_add_enemy(0.05 * 3/(1+gs.bullet_level));
+                gs.maybe(0.05 * (1/(1+(gs.bullet_level/4))), [&]() {
                     gs.with_new_entity([&](Entity::Name) {
                         Entity::PowerUp *p = new Entity::PowerUp(Entity::PowerUp::Shield);
                         p->txt_name = "powerup_shield";
@@ -574,7 +584,7 @@ namespace Letvetzi {
                         return p;
                     });
                 });
-                gs.maybe(0.10, [&]() {
+                gs.maybe(0.1 * (1/(1+(gs.bullet_level/4))), [&]() {
                     gs.with_new_entity([&](Entity::Name) {
                         Entity::PowerUp *p = new Entity::PowerUp(Entity::PowerUp::Bolt);
                         p->txt_name = "powerup_bolt";
@@ -603,8 +613,6 @@ namespace Letvetzi {
             } else {
                 this->kill();
                 gs.add_enemy();
-                gs.maybe_add_enemy(0.02);
-                gs.add_life(-1);
             }
         };
     }
@@ -630,9 +638,9 @@ namespace Letvetzi {
 
         class Shoot {
             public:
-                Velocity vel;
+                bool key_down = true;
 
-                Shoot(int16_t accel)  : vel(Velocity(0,-accel)) {
+                Shoot(bool key_down)  : key_down(key_down) {
                 };
         };
         class EscKey {
@@ -648,10 +656,11 @@ namespace Letvetzi {
             void operator()(Shoot ev) const {
                 switch (s.game_state) {
                     case GameState::Type::Running:
-                        ev.vel = (1 + 0.4 * std::min(5,s.bullet_level)) * ev.vel;
-                        s.add_bullet(ev.vel);
+                        s.shooting = ev.key_down;
+                        if (s.shooting) s.shoot_tempo = 0;
                     break;
                     case GameState::Type::GameOver:
+                        if (!ev.key_down) break;
                         s.game_state = GameState::Type::RestartGame;
                     break;
                     case GameState::Type::GameMenu:
@@ -730,6 +739,9 @@ namespace Letvetzi {
                             menu.opts.push_back(GameState::MenuOption{"Credits",[](GameState::Type& s) {
                                 s.show_credits();
                             }});
+                            menu.opts.push_back(GameState::MenuOption{"Back to main menu", [](GameState::Type& s) {
+                                s.restart_game();
+                            }});
                             menu.opts.push_back(GameState::MenuOption{"Quit game", [](GameState::Type& s) {
                                 s.quit_game();
                             }});
@@ -767,15 +779,14 @@ namespace Letvetzi {
                         if(ev.key.repeat == 0) {
                             switch(ev.key.keysym.sym) {
                                 case SDLK_LEFT:  game_events.push(Events::Type(Events::PlayerMove(Events::Left)));
-                                                  break;
+                                                 break;
                                 case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(Events::Right)));
                                                  break;
                                 case SDLK_ESCAPE: game_events.push(Events::Type(Events::EscKey()));
-                            }
-                        }
-                        switch(ev.key.keysym.sym) {
-                            case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(150)));
-                                             break;
+                                                 break;
+                                case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(true)));
+                                                 break;
+                            };
                         }
                         break;
                 case SDL_KEYUP:
@@ -784,8 +795,8 @@ namespace Letvetzi {
                                              break;
                             case SDLK_RIGHT: game_events.push(Events::Type(Events::PlayerMove(Events::StopRight)));
                                              break;
-                            /*case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(200)));
-                                             break; */
+                            case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(false)));
+                                             break;
                             default: break;
                         }
                         break;
@@ -875,6 +886,18 @@ namespace Letvetzi {
         Game::LSit Eng::render_Running() {
 
             std::shared_ptr<Entity::Type> player_pointer = s.ent_mp[Entity::PlayerID()];
+
+            {
+                if (s.shooting) {
+                    s.shoot_tempo -= fps_relation;
+                    if (s.shoot_tempo <= 0) {
+                        Velocity vel = Velocity(0,-200);
+                        vel = (1 + 0.4 * std::min(5,s.bullet_level)) * vel;
+                        s.add_bullet(vel);
+                        s.shoot_tempo = 50;
+                    }
+                };
+            };
 
             /* draw entities on the world */
             for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
