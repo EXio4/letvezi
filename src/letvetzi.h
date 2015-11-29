@@ -12,63 +12,6 @@
 #include "game.h"
 
 namespace Letvetzi {
-    // 13 42 37 = letvezi things
-    uint32_t options_magic_num = 0x13423701;
-    std::string options_file = "options.dat";
-    struct Options {
-    private:
-        std::mutex m_;
-        SDL_Keycode space      = SDLK_SPACE;
-        SDL_Keycode left_key   = SDLK_LEFT;
-        SDL_Keycode right_key  = SDLK_RIGHT;
-        SDL_Keycode escape     = SDLK_ESCAPE;
-    public:
-        void modify(std::function<void(SDL_Keycode&,SDL_Keycode&, SDL_Keycode&, SDL_Keycode&)> fn) {
-                std::lock_guard<std::mutex> mlock(m_);
-                return fn(space, left_key, right_key, escape);
-        };
-        SDL_Keycode key_space() {
-            std::lock_guard<std::mutex> mlock(m_);
-            return space;
-        };
-        SDL_Keycode key_left() {
-            std::lock_guard<std::mutex> mlock(m_);
-            return left_key;
-        };
-        SDL_Keycode key_right() {
-            std::lock_guard<std::mutex> mlock(m_);
-            return right_key;
-        };
-        SDL_Keycode key_escape() {
-            std::lock_guard<std::mutex> mlock(m_);
-            return escape;
-        };
-
-        Options(std::string file_to_load) {
-            {
-                std::fstream fil(file_to_load.c_str(), std::ios::binary | std::ios::in);
-                uint32_t header;
-                fil.read((char*)&header, sizeof(header));
-                if (header != options_magic_num) throw ""; // TODO
-                fil.read((char*)&space    , sizeof(SDL_Keycode));
-                fil.read((char*)&left_key , sizeof(SDL_Keycode));
-                fil.read((char*)&right_key, sizeof(SDL_Keycode));
-                fil.read((char*)&escape   , sizeof(SDL_Keycode));
-            };
-        };
-        void save_to(std::string file) {
-            {
-                std::fstream fil(file.c_str(), std::ios::binary | std::ios::out);
-
-                fil.write((char*)&options_magic_num, sizeof(uint32_t));
-                fil.write((char*)&space    , sizeof(SDL_Keycode));
-                fil.write((char*)&left_key , sizeof(SDL_Keycode));
-                fil.write((char*)&right_key, sizeof(SDL_Keycode));
-                fil.write((char*)&escape   , sizeof(SDL_Keycode));
-
-            }
-        };
-    };
     struct VelocityT {
         typedef int16_t scalar;
     };
