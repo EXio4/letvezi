@@ -34,7 +34,7 @@ int main() {
         gs.load_png("enemy_laser"  , "art/enemy_laser.png");
 
         gs.load_png("powerup_shield", "art/powerup_shield.png");
-        gs.load_png("powerup_weapon", "art/powerup_weapon.png");
+        gs.load_png("powerup_bolt"  , "art/powerup_bolt.png");
 
         Game::Resolution res = gs.get_current_res();
         Letvetzi::GameState::Type start_state =

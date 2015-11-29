@@ -473,6 +473,10 @@ namespace Letvetzi {
                     return static_cast<Entity::Type*>(entity);
                 });
             };
+            void maybe(double prob, std::function<void()> fn) {
+                double  p  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
+                if (p > 1-prob) fn();
+            };
 
             void with_new_entity(std::function<Entity::Type*(Entity::Name)> fn) {
                  Entity::Name e = last_entity;
@@ -548,20 +552,27 @@ namespace Letvetzi {
             return false;
         };
 
-        bool Collision::on_collision(GameState::Type& gs, Player&, Enemy& e) {
+        bool Collision::on_collision(GameState::Type& gs, Player& p, Enemy& e) {
             // TODO: balance tweaks, suggestions for this?
             e.kill();
-            gs.add_enemy();
+            if (!p.shield) {
+                gs.add_enemy();
+            } else {
+                gs.add_life(-1);
+            };
             gs.add_enemy();
             return true;
         };
         bool Collision::on_collision(GameState::Type&, Player& pl, PowerUp& pup) {
             // TODO: powerups
             if (pup.kind == PowerUp::Shield) pl.shield += 5000;
+            pup.kill();
             return true;
         };
-        bool Collision::on_collision(GameState::Type& gs, Player&, EnemyBullet& b) {
-            gs.add_life(-1);
+        bool Collision::on_collision(GameState::Type& gs, Player& p, EnemyBullet& b) {
+            if (!p.shield) {
+                gs.add_life(-1);
+            };
             b.kill();
             return true;
         };
@@ -578,6 +589,15 @@ namespace Letvetzi {
                 e.kill();
                 gs.add_enemy();
                 gs.maybe_add_enemy(0.05);
+                gs.maybe(0.10, [&]() {
+                    gs.with_new_entity([&](Entity::Name) {
+                        Entity::PowerUp *p = new Entity::PowerUp(Entity::PowerUp::Shield);
+                        p->txt_name = "powerup_shield";
+                        p->pos = e.pos;
+                        p->vel = Velocity(0, 25);
+                        return p;
+                    });
+                });
             };
             gs.add_points(e.score);
             return true;
