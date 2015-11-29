@@ -30,6 +30,7 @@ int main() {
         gs.load_png("enemy_1"      , "art/enemy_1.png");
         gs.load_png("enemy_2"      , "art/enemy_2.png");
         gs.load_png("enemy_3"      , "art/enemy_3.png");
+        gs.load_png("enemy_boss"   , "art/enemy_boss.png");
         gs.load_png("enemy_laser"  , "art/enemy_laser.png");
 
         gs.load_png("powerup_shield", "art/powerup_shield.png");
