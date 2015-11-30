@@ -263,6 +263,15 @@ namespace Letvetzi {
             };
         };
 
+        class EvBoss {
+          private:
+             Type& s;
+             Entity::Type& en;
+          public:
+            EvBoss(Type& s, Entity::Type& en) : s(s), en(en) {};
+            void operator() ();
+        };
+
 
         int boss_rate = 25000;
         class Type {
@@ -432,19 +441,6 @@ namespace Letvetzi {
             };
 
             void start_boss(int boss_id) {
-                auto boss_fn = [&](Entity::Enemy& en) {
-                    std::function<void()> fun = [&]() {
-                        with_new_entity([&](Entity::Name) {
-                            Entity::EnemyBullet* b = new Entity::EnemyBullet();
-                            b->txt_name = "enemy_laser";
-                            b->pos = en.pos + Position(55,40);
-                            b->vel = Velocity(0, 100);
-                            return b;
-                        });
-                        sdl_inf->tim.add_timer(1000, fun);
-                    };
-                    return fun;
-                };
                 for (int i=0; i<1+(boss_id/5); i++) {
                     double  p  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
                     int pos = res.width / 4 + p * 2 * res.width/4;
@@ -453,7 +449,7 @@ namespace Letvetzi {
                         entity->pos = Position(pos, 48);
                         entity->vel = Velocity(40,0);
                         entity->txt_name = "enemy_boss";
-                        boss_fn(*entity);
+                        sdl_inf->tim.add_timer(400, EvBoss(*this, *entity));
                         return static_cast<Entity::Type*>(entity);
                     });
                 };
@@ -465,7 +461,7 @@ namespace Letvetzi {
                         entity->pos = Position(pos, 48 + 64);
                         entity->vel = Velocity(20, 100);
                         entity->txt_name = "enemy_boss_squad";
-                        boss_fn(*entity);
+                        sdl_inf->tim.add_timer(400, EvBoss(*this, *entity));
                         return static_cast<Entity::Type*>(entity);
                     });
                 };
@@ -493,6 +489,16 @@ namespace Letvetzi {
                 if (lives == 0) game_state = GameState::Type::GameOver;
             };
         };
+        void EvBoss::operator() () {
+            s.with_new_entity([&](Entity::Name) {
+                Entity::EnemyBullet* b = new Entity::EnemyBullet();
+                b->txt_name = "enemy_laser";
+                b->pos = en.pos + Position(55,40);
+                b->vel = Velocity(0, 100);
+                return b;
+            });
+            s.sdl_inf->tim.add_timer(1000, *this);
+        } 
     }
 
     namespace Entity {

@@ -19,7 +19,7 @@ int main() {
         }
         if (TTF_Init() < 0) { throw Game::SDLError(TTF_GetError()); }
         if(Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-            throw Game::SDLError(Mix_GetError());
+            printf("Error starting SDL_Mix: %s\n", Mix_GetError());
         }
         Game::sdl_info gs("Letvetzi", "art/font.ttf", "art/background.ogg");
 
