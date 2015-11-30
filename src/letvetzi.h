@@ -6,8 +6,10 @@
 #include <list>
 #include <random>
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <boost/variant.hpp>
+#include "timer.h"
 #include "vect.h"
 #include "game.h"
 
@@ -260,6 +262,8 @@ namespace Letvetzi {
                 current = (current + x) % opts.size();
             };
         };
+
+
         int boss_rate = 25000;
         class Type {
             public:
@@ -269,7 +273,7 @@ namespace Letvetzi {
             int            til_boss = boss_rate;
             int            bosses_killed = 0;
             bool           shooting = false;
-            int            shoot_tempo = -1;
+
             enum Current {
                 Running      ,
                 GameOver     ,
@@ -428,6 +432,19 @@ namespace Letvetzi {
             };
 
             void start_boss(int boss_id) {
+                auto boss_fn = [&](Entity::Enemy& en) {
+                    std::function<void()> fun = [&]() {
+                        with_new_entity([&](Entity::Name) {
+                            Entity::EnemyBullet* b = new Entity::EnemyBullet();
+                            b->txt_name = "enemy_laser";
+                            b->pos = en.pos + Position(55,40);
+                            b->vel = Velocity(0, 100);
+                            return b;
+                        });
+                        sdl_inf->tim.add_timer(1000, fun);
+                    };
+                    return fun;
+                };
                 for (int i=0; i<1+(boss_id/5); i++) {
                     double  p  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
                     int pos = res.width / 4 + p * 2 * res.width/4;
@@ -436,6 +453,7 @@ namespace Letvetzi {
                         entity->pos = Position(pos, 48);
                         entity->vel = Velocity(40,0);
                         entity->txt_name = "enemy_boss";
+                        boss_fn(*entity);
                         return static_cast<Entity::Type*>(entity);
                     });
                 };
@@ -447,6 +465,7 @@ namespace Letvetzi {
                         entity->pos = Position(pos, 48 + 64);
                         entity->vel = Velocity(20, 100);
                         entity->txt_name = "enemy_boss_squad";
+                        boss_fn(*entity);
                         return static_cast<Entity::Type*>(entity);
                     });
                 };
@@ -648,6 +667,21 @@ namespace Letvetzi {
                 EscKey() {};
         };
 
+        class Ev {
+           private:
+              GameState::Type& s;
+           public:
+              Ev(GameState::Type& s) : s(s) { };
+              void operator() () {
+                 if (s.game_state == GameState::Type::Running && s.shooting) {
+                     Velocity vel = Velocity(0,-120);
+                     vel = (1 + 0.4 * std::min(5,s.bullet_level)) * vel;
+                     s.add_bullet(vel);
+                     s.sdl_inf->tim.add_timer(150, *this);
+                 };
+              };
+        };
+
         class ApplyEvent : public boost::static_visitor<void> {
         private:
             GameState::Type& s;
@@ -657,16 +691,20 @@ namespace Letvetzi {
                 switch (s.game_state) {
                     case GameState::Type::Running:
                         s.shooting = ev.key_down;
-                        if (s.shooting) s.shoot_tempo = 0;
+                        {
+                           s.sdl_inf->tim.add_timer(0, Ev(s));
+                        };
                     break;
                     case GameState::Type::GameOver:
                         if (!ev.key_down) break;
                         s.game_state = GameState::Type::RestartGame;
                     break;
                     case GameState::Type::GameMenu:
+                        if (!ev.key_down) break;
                         s.menu.pressed = 150;
                     break;
                     case GameState::Type::Credits:
+                        if (!ev.key_down) break;
                         s.game_state = GameState::Type::GameMenu; // we go back to the menu, whatever it was before...
                     case GameState::Type::QuitGame:
                     case GameState::Type::RestartGame:
@@ -887,18 +925,6 @@ namespace Letvetzi {
 
             std::shared_ptr<Entity::Type> player_pointer = s.ent_mp[Entity::PlayerID()];
 
-            {
-                if (s.shooting) {
-                    s.shoot_tempo -= fps_relation;
-                    if (s.shoot_tempo <= 0) {
-                        Velocity vel = Velocity(0,-200);
-                        vel = (1 + 0.4 * std::min(5,s.bullet_level)) * vel;
-                        s.add_bullet(vel);
-                        s.shoot_tempo = 50;
-                    }
-                };
-            };
-
             /* draw entities on the world */
             for (auto curr = s.ent_mp.begin() ; curr != s.ent_mp.end() ;) {
                 if (curr->second->killed) {
@@ -1099,12 +1125,13 @@ namespace Letvetzi {
                 /**/
         }
 
-        Game::LSit handler_game(Game::sdl_info&                   gs,
+        Game::LSit handler_game(Game::sdl_info&              gs,
                                 Conc::VarL<GameState::Type>& svar,
                                 uint16_t                     fps_relation) {
             return svar.modify([&](GameState::Type& s) {
                 Eng eng = Eng(gs, s, fps_relation);
                 eng.render_background();
+                gs.tim.advance(fps_relation);
                 switch (s.game_state) {
                     case GameState::Type::GameOver:
                         return eng.render_GameOver();
@@ -1145,20 +1172,7 @@ namespace Letvetzi {
         };
         void PowerUp::extra_render(GameState::Type&, Game::sdl_info&, int) {
         };
-        void Enemy::extra_render(GameState::Type& gs, Game::sdl_info&, int fps_rel) {
-            if (boss) {
-                til_next_shoot -= fps_rel;
-                if (til_next_shoot <= 0) {
-                    til_next_shoot = 1000;
-                    gs.with_new_entity([&](Entity::Name) {
-                        Entity::EnemyBullet* b = new Entity::EnemyBullet();
-                        b->txt_name = "enemy_laser";
-                        b->pos = pos + Position(55,40);
-                        b->vel = Velocity(0, 100);
-                        return b;
-                    });
-                };
-            };
+        void Enemy::extra_render(GameState::Type&, Game::sdl_info&, int) {
         };
     }
 

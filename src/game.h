@@ -8,7 +8,8 @@
 #include <thread>
 #include <mutex>
 #include <stdexcept>
-#include <conc.h>
+#include "conc.h"
+#include "timer.h"
 
 namespace Game {
 
@@ -67,6 +68,8 @@ namespace Game {
         public:
             SDL_Window*   window        = NULL;
             SDL_Renderer* win_renderer  = NULL;
+
+            Timer tim;
 
             sdl_info(const char* game_name, std::string font_name, std::string bg_name, int fps_param=60) {
                 window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
