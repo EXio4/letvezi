@@ -266,9 +266,9 @@ namespace Letvetzi {
         class EvBoss {
           private:
              Type& s;
-             Entity::Type& en;
+             std::shared_ptr<Entity::Type> en;
           public:
-            EvBoss(Type& s, Entity::Type& en) : s(s), en(en) {};
+            EvBoss(Type& s, std::shared_ptr<Entity::Type> en) : s(s), en(en) {};
             void operator() ();
         };
 
@@ -343,23 +343,23 @@ namespace Letvetzi {
                     x = std::min<int16_t>(x, res.width - 100);
                     // we reuse the random number generator of the bg_particles, TODO: rename it
                     if (type > 0.9) {
-                        Entity::Enemy *entity = new Entity::Enemy(300, 2 + 0.5 * bullet_level);
+                        auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(300, 2 + 0.5 * bullet_level));
                         entity->pos = Position(x, 2);
                         entity->vel = Velocity(0,55 + bullet_rel);
                         entity->txt_name = "enemy_3";
-                        return static_cast<Entity::Type*>(entity);
+                        return entity;
                     } else if (type > 0.4) {
-                        Entity::Enemy *entity = new Entity::Enemy(200, 1 + 0.35 * bullet_level);
+                        auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(200, 1 + 0.35 * bullet_level));
                         entity->pos = Position(x, 2);
                         entity->vel = Velocity(0,50 + bullet_rel);
                         entity->txt_name = "enemy_2";
-                        return static_cast<Entity::Type*>(entity);
+                        return entity;
                     } else {
-                        Entity::Enemy *entity = new Entity::Enemy(100, 1 + 0.25 * bullet_level);
+                        auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(100, 1 + 0.25 * bullet_level));
                         entity->pos = Position(x, 5);
                         entity->vel = Velocity(0,40 + bullet_rel);
-                        entity->txt_name = "enemy_1";
-                        return static_cast<Entity::Type*>(entity);
+                        entity->txt_name =   "enemy_1";
+                        return entity;
                     } 
 
                 });
@@ -380,7 +380,7 @@ namespace Letvetzi {
                                 };
                 for (int i=1; i <= mx; i++) {
                     with_new_entity([&](Entity::Name) {
-                        Entity::PlayerBullet *entity = new Entity::PlayerBullet();
+                        std::shared_ptr<Entity::PlayerBullet> entity = std::shared_ptr<Entity::PlayerBullet>(new Entity::PlayerBullet());
                         entity->pos        = ent_mp[Entity::PlayerID()]->pos;
                         entity->pos.x     += mp[i];
                         entity->txt_name   = "player_laser";
@@ -445,24 +445,24 @@ namespace Letvetzi {
                     double  p  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
                     int pos = res.width / 4 + p * 2 * res.width/4;
                     with_new_entity([&](Entity::Name) {
-                        Entity::Enemy *entity = new Entity::Enemy(500, 3+2*std::min(5,bullet_level)*boss_id, true);
+                        auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(500, 3+2*std::min(5,bullet_level)*boss_id, true));
                         entity->pos = Position(pos, 48);
                         entity->vel = Velocity(40,0);
                         entity->txt_name = "enemy_boss";
-                        sdl_inf->tim.add_timer(400, EvBoss(*this, *entity));
-                        return static_cast<Entity::Type*>(entity);
+                        sdl_inf->tim.add_timer(400, EvBoss(*this, entity));
+                        return entity;
                     });
                 };
                 for (int i=0; i<1+(boss_id * 2); i++) {
                     double p = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
                     int pos = res.width / 4 + p * 2 * res.width/4;
                     with_new_entity([&](Entity::Name) {
-                        Entity::Enemy *entity = new Entity::Enemy(500, std::min(5,boss_id), true);
+                        auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(500, std::min(5,boss_id), true));
                         entity->pos = Position(pos, 48 + 64);
                         entity->vel = Velocity(20, 100);
                         entity->txt_name = "enemy_boss_squad";
-                        sdl_inf->tim.add_timer(400, EvBoss(*this, *entity));
-                        return static_cast<Entity::Type*>(entity);
+                        sdl_inf->tim.add_timer(400, EvBoss(*this, entity));
+                        return entity;
                     });
                 };
             };
@@ -471,10 +471,10 @@ namespace Letvetzi {
                 if (p > 1-prob) fn();
             };
 
-            void with_new_entity(std::function<Entity::Type*(Entity::Name)> fn) {
+            void with_new_entity(std::function<std::shared_ptr<Entity::Type>(Entity::Name)> fn) {
                  Entity::Name e = last_entity;
                  ++last_entity;
-                 ent_mp[e] = std::shared_ptr<Entity::Type>(fn(e));
+                 ent_mp[e] = fn(e);
             }
             void add_points(uint32_t p) {
                 points += p;
@@ -490,14 +490,16 @@ namespace Letvetzi {
             };
         };
         void EvBoss::operator() () {
-            s.with_new_entity([&](Entity::Name) {
-                Entity::EnemyBullet* b = new Entity::EnemyBullet();
-                b->txt_name = "enemy_laser";
-                b->pos = en.pos + Position(55,40);
-                b->vel = Velocity(0, 100);
-                return b;
-            });
-            s.sdl_inf->tim.add_timer(1000, *this);
+            if (!en->killed) {
+                s.with_new_entity([&](Entity::Name) {
+                    auto b = std::shared_ptr<Entity::EnemyBullet>(new Entity::EnemyBullet());
+                    b->txt_name = "enemy_laser";
+                    b->pos = en->pos + Position(55,40);
+                    b->vel = Velocity(0, 100);
+                    return b;
+                });
+                s.sdl_inf->tim.add_timer(1000, *this);
+            };
         } 
     }
 
@@ -510,7 +512,7 @@ namespace Letvetzi {
             bool on_collision(GameState::Type&   , Player&         , PowerUp&        );
             // enemy vs the world
             bool on_collision(GameState::Type&   , Enemy&          , Enemy&          );
-            bool on_collision(GameState::Type&   , Enemy&          , PlayerBullet&   ); 
+            bool on_collision(GameState::Type&   , Enemy&      x    , PlayerBullet&   ); 
             bool on_collision(GameState::Type&   , Enemy&          , EnemyBullet&    ); NOP
             bool on_collision(GameState::Type&   , Enemy&          , PowerUp&        ); NOP
             // player_bullet vs the world
@@ -602,7 +604,7 @@ namespace Letvetzi {
                 gs.maybe_add_enemy(0.05 * 3/(1+gs.bullet_level));
                 gs.maybe(0.05 * (1/(1+(gs.bullet_level/4))), [&]() {
                     gs.with_new_entity([&](Entity::Name) {
-                        Entity::PowerUp *p = new Entity::PowerUp(Entity::PowerUp::Shield);
+                        auto p = std::shared_ptr<Entity::PowerUp>(new Entity::PowerUp(Entity::PowerUp::Shield));
                         p->txt_name = "powerup_shield";
                         p->pos = e.pos;
                         p->vel = Velocity(0, 45);
@@ -611,7 +613,7 @@ namespace Letvetzi {
                 });
                 gs.maybe(0.1 * (1/(1+(gs.bullet_level/4))), [&]() {
                     gs.with_new_entity([&](Entity::Name) {
-                        Entity::PowerUp *p = new Entity::PowerUp(Entity::PowerUp::Bolt);
+                        auto p = std::shared_ptr<Entity::PowerUp>(new Entity::PowerUp(Entity::PowerUp::Bolt));
                         p->txt_name = "powerup_bolt";
                         p->pos = e.pos + Position(0,40);
                         p->vel = Velocity(0, 45);
@@ -683,7 +685,7 @@ namespace Letvetzi {
                      Velocity vel = Velocity(0,-120);
                      vel = (1 + 0.4 * std::min(5,s.bullet_level)) * vel;
                      s.add_bullet(vel);
-                     s.sdl_inf->tim.add_timer(150, *this);
+                     s.sdl_inf->tim.add_timer(100, *this);
                  };
               };
         };
