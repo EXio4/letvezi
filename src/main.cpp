@@ -43,11 +43,15 @@ int main() {
         gs.load_sfx("player_laser" , "art/sfx/player_laser.ogg");
         gs.load_sfx("shield_enabled", "art/sfx/player_laser.ogg");
 
+        HighScores high_scores("high_scores.dat");
+        std::cout << "Trying to load high scores from high_scores.dat .. " << std::endl;
+        high_scores.load();
+
         Game::Resolution res = gs.get_current_res();
         Letvetzi::GameState::Type start_state =
                    Letvetzi::GameState::Type(res,
                             Letvetzi::Position(res.width/2, res.height-70-gs.textures().at("player").height),
-                                &gs);
+                                &gs, &high_scores);
 
         std::function<void(Conc::Chan<SDL_Event>&,Conc::Chan<Letvetzi::Events::Type>&)> event_fn =
                 Letvetzi::event_handler;
@@ -59,7 +63,7 @@ int main() {
                         };
 
         gs.loop(event_fn, game_fn, render_fn, start_state);
-
+        high_scores.save();
         printf("Game over!\n");
 
 

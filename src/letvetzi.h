@@ -11,6 +11,7 @@
 #include <boost/variant.hpp>
 #include "timer.h"
 #include "vect.h"
+#include "highscores.h"
 #include "game.h"
 
 namespace Letvetzi {
@@ -276,12 +277,14 @@ namespace Letvetzi {
         int boss_rate = 25000;
         class Type {
             public:
+            std::string player_name = "YOU";
             uint64_t       points  = 0;
-            unsigned int   lives   = 10;
+            int32_t        lives   = 10;
             int            bullet_level = 1;
             int            til_boss = boss_rate;
             int            bosses_killed = 0;
             bool           shooting = false;
+            HighScores*    high_scores;
 
             enum Current {
                 Running      ,
@@ -305,8 +308,8 @@ namespace Letvetzi {
             } bg_particles_gen;
             std::map<Entity::Name,std::shared_ptr<Entity::Type>> ent_mp;
             Entity::Name last_entity = Entity::Name(1);
-            Type(Game::Resolution res_p, Position player_p, Game::sdl_info* sdl_inf)
-               : res(res_p), player_original(player_p), sdl_inf(sdl_inf) {
+            Type(Game::Resolution res_p, Position player_p, Game::sdl_info* sdl_inf, HighScores* high_scores)
+               : high_scores(high_scores), res(res_p), player_original(player_p), sdl_inf(sdl_inf) {
                 { std::random_device rd;
                   std::default_random_engine r_eg(rd());;
                   std::uniform_int_distribution<int16_t> start_pos(0, res.width); // start positions \x -> (x,0)
@@ -486,7 +489,10 @@ namespace Letvetzi {
             };
             void add_life(unsigned int li) {
                 lives += li;
-                if (lives == 0) game_state = GameState::Type::GameOver;
+                if (lives == 0) {
+                    high_scores->add_score(player_name, points);
+                    game_state = GameState::Type::GameOver;
+                };
             };
         };
         void EvBoss::operator() () {
@@ -571,7 +577,7 @@ namespace Letvetzi {
             // TODO: powerups
             if (pup.kind == PowerUp::Shield) {
                 gs.sdl_inf->play_sfx("shield_enabled");
-                pl.shield += 5000;
+                pl.shield += 1000;
             } else if (pup.kind == PowerUp::Bolt) {
                 gs.bullet_level++;
             }
@@ -602,7 +608,7 @@ namespace Letvetzi {
                     gs.maybe_add_enemy(0.05);
                 };
                 gs.maybe_add_enemy(0.05 * 3/(1+gs.bullet_level));
-                gs.maybe(0.05 * (1/(1+(gs.bullet_level/4))), [&]() {
+                gs.maybe(0.05 * (1/(1+(gs.bullet_level/6))), [&]() {
                     gs.with_new_entity([&](Entity::Name) {
                         auto p = std::shared_ptr<Entity::PowerUp>(new Entity::PowerUp(Entity::PowerUp::Shield));
                         p->txt_name = "powerup_shield";
@@ -620,8 +626,9 @@ namespace Letvetzi {
                         return p;
                     });
                 });
+                gs.add_points(e.score*1.5);
             };
-            gs.add_points(e.score);
+            gs.add_points(e.score/4);
             return true;
         };
 
@@ -781,6 +788,9 @@ namespace Letvetzi {
                             menu.title = "PAUSE";
                             menu.opts.push_back(GameState::MenuOption{"Continue playing", [](GameState::Type& s) {
                                 s.game_state = GameState::Type::Running;
+                            }});
+                            menu.opts.push_back(GameState::MenuOption{"KILL MYSELF", [](GameState::Type& s) {
+                                s.add_life(-s.lives);
                             }});
                             menu.opts.push_back(GameState::MenuOption{"Credits",[](GameState::Type& s) {
                                 s.show_credits();
@@ -979,7 +989,7 @@ namespace Letvetzi {
                 hud.add_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
                 hud.add_text(48, s.res.height - 48, txt_color, "Lives: ");
                 Position pos(48 + 20 * 7, s.res.height - 48);
-                for (unsigned int i=0; i < s.lives; i++) {
+                for (int32_t i=0; i < s.lives; i++) {
                     hud.add_image("player_life", pos);
                     pos.x += 40;
                 };
@@ -993,10 +1003,21 @@ namespace Letvetzi {
         Game::LSit Eng::render_GameOver() {
             {
                 Hud hud;
-                SDL_Color txt_color = {200, 200, 200, 255}; // hud color
-                hud.start_hud = s.res.height - 128;
+                {
+                    SDL_Color player_name {200,   0, 200, 255};
+                    SDL_Color points      {200, 200, 200, 255};
+                    hud.add_text(Position(48, 64+16), points, "High scores");
+                    Position pos(64, 64+48);
+                    for (auto& r : s.high_scores->table()) {
+                        hud.add_text(pos, player_name , r.name);
+                        hud.add_text(pos + Position(s.res.width/3, 0) , points, std::to_string(r.points));
+                        pos += Position(0,48);
+                    };
+                };
+                SDL_Color txt_color {200, 200, 200, 255}; // hud color
+                hud.start_hud = s.res.height - 64;
                 hud.add_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
-                SDL_Color game_over_c = {255, 0, 0, 255};
+                SDL_Color game_over_c {255, 0, 0, 255};
                 hud.add_text(48, s.res.height - 100, game_over_c, "GAME OVER");
                 SDL_Color game_over_c2 = {0,0,255,255};
                 hud.add_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to go back to the main menu");
