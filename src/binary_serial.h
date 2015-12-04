@@ -1,6 +1,10 @@
+#pragma once
 
 #include <iostream>
+#include <queue>
 #include <boost/endian/arithmetic.hpp>
+#include <stdexcept>
+#include <typeinfo>
 
 namespace Binary {
     class NotEnoughData: public std::runtime_error {
@@ -62,21 +66,8 @@ namespace Binary {
         };
     };
 
-    Data operator+(Data x, Data y) {
-        if (y.q.empty()) return x;
-        Data w;
-        w.q = x.q;
-        for (auto e = y.q.front() ; !y.q.empty() ; y.q.pop()) {
-            w.q.push(e);
-        };
-        return w;
-    }
-    Data& operator+=(Data& x, Data y) {
-        while (!y.q.empty()) {
-            x.q.push(y.getByte());
-        };
-        return x;
-    };
+    Data operator+(Data x, Data y);
+    Data& operator+=(Data& x, Data y);
 
     template <typename T = uint8_t>
     struct data_int {};
@@ -124,21 +115,6 @@ namespace Binary {
         return (T)*(ENDIAN_T*)&arr;
     };
 
-    template<> Data serialize(std::string str) {
-        Data w = serialize<uint32_t>(str.size());
-        for (auto& c : str) {
-            w += serialize<uint8_t>(c);
-        };
-        return w;
-    };
-    template<> std::string deserialize(Data& d) {
-        std::string str = "";
-        {
-            auto size = deserialize<uint32_t>(d);
-            for (uint32_t j=0; j<size; j++) {
-                str.push_back(Binary::deserialize<uint8_t>(d));
-            };
-        };
-        return str;
-    };
+    template<> Data serialize(std::string);
+    template<> std::string deserialize(Data&);
 };

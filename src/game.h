@@ -72,67 +72,17 @@ namespace Game {
 
             Timer tim;
 
-            sdl_info(const char* game_name, std::string font_name, std::string bg_name, int fps_param=60) {
-                window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
-                if (window == NULL) { throw SDLError(); }
-                win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED );
-                if (fps_param > 0) fps = fps_param;
-                fonts[Small]  = TTF_OpenFont(font_name.c_str(), 20);
-                fonts[Normal] = TTF_OpenFont(font_name.c_str(), 24);
-                fonts[Huge]   = TTF_OpenFont(font_name.c_str(), 32);
-                music = Mix_LoadMUS(bg_name.c_str());
-                Mix_PlayMusic(music, -1);
-                Mix_VolumeMusic(MIX_MAX_VOLUME / 4);
-            }
-            ~sdl_info() {
-                for (const auto& pair : txts) {
-                    SDL_DestroyTexture(pair.second.texture);
-                };
-                SDL_DestroyWindow(window);
-            }
+            sdl_info(const char* game_name, std::string font_name, std::string bg_name, int fps_param=60);
+            ~sdl_info();
 
-            Resolution get_current_res() {
-                SDL_DisplayMode current;
-                SDL_GetCurrentDisplayMode(0, &current); // we assume nothing goes wrong..
-                return Resolution(current.w, current.h);
-            }
+            Resolution get_current_res();
 
-            void load_png(std::string key, std::string path) {
-                 {
-                    auto it = txts.find(key);
-                    if (it != txts.end()) return;
-                 }
-                 SDL_Surface* loadedSurface = IMG_Load(path.c_str());
-                 if (loadedSurface == NULL) { throw SDLError(IMG_GetError()); }
-                 SDL_Texture* texture = SDL_CreateTextureFromSurface(win_renderer, loadedSurface);
-                 SDL_FreeSurface(loadedSurface);
-                 TextureInfo &inf = txts[key];
-                 SDL_QueryTexture(texture, NULL, NULL, &(inf.width), &(inf.height));
-                 inf.texture = texture;
-            }
+            void load_png(std::string key, std::string path);
 
-            void load_sfx(std::string key, std::string path) {
-                sfx[key] = Mix_LoadWAV(path.c_str());
-            };
+            void load_sfx(std::string key, std::string path);
+            void play_sfx(std::string key);
 
-            void play_sfx(std::string key) {
-                Mix_PlayChannel(-1, sfx[key], 0);
-            };
-
-            void render_text(int x, int y, FontID f_id, SDL_Color txt_color, std::string text) {
-                SDL_Rect  pos;
-                SDL_Surface* textSurface = TTF_RenderUTF8_Solid(fonts[f_id], text.c_str(), txt_color);
-                SDL_Texture* textTexture = SDL_CreateTextureFromSurface(win_renderer, textSurface);
-                if (textSurface == NULL) return;
-                pos.h = textSurface->h;
-                pos.w = textSurface->w;
-                pos.x = x;
-                pos.y = y;
-                SDL_FreeSurface(textSurface);
-                SDL_SetTextureBlendMode(textTexture, SDL_BLENDMODE_BLEND);
-                SDL_RenderCopy(win_renderer, textTexture, NULL, &pos);
-                SDL_DestroyTexture(textTexture);
-            };
+            void render_text(int x, int y, FontID f_id, SDL_Color txt_color, std::string text);
 
             template <typename F>
             auto with(std::string key, F&& fn) {
@@ -143,6 +93,7 @@ namespace Game {
                 /* we use .at as if it didn't exist, we already threw a nice error message */
                 return fn(surf);
             }
+
             const std::map<std::string,TextureInfo>& textures() {
                 return txts;
             }
