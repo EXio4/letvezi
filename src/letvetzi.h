@@ -301,203 +301,26 @@ namespace Letvetzi {
             } bg_particles_gen;
             std::map<Entity::Name,std::shared_ptr<Entity::Type>> ent_mp;
             Entity::Name last_entity = Entity::Name(1);
-            Type(Game::Resolution res_p, Position player_p, Game::sdl_info* sdl_inf, Persistent* persistent)
-               : persistent_data(persistent), res(res_p), player_original(player_p), sdl_inf(sdl_inf) {
-                { std::random_device rd;
-                  std::default_random_engine r_eg(rd());;
-                  std::uniform_int_distribution<int16_t> start_pos(0, res.width); // start positions \x -> (x,0)
-                  std::uniform_int_distribution<int16_t> start_speed(40,100); // speed
-                  std::uniform_real_distribution<double> enemy_type(0,1); // enemy typ[e
-                  bg_particles_gen.random_eng = r_eg;
-                  bg_particles_gen.start_pos = start_pos;
-                  bg_particles_gen.start_speed = start_speed;
-                  bg_particles_gen.enemy_type  = enemy_type;
-                };
-                {
-                    for (int i=0; i<res.width/20; i++) {
-                        add_bg_particle((i*100)%res.height);
-                    };
+            Type(Game::Resolution res_p, Position player_p, Game::sdl_info* sdl_inf, Persistent* persistent);
 
-                    restart_game(true);
-                };
+            void add_bg_particle(int16_t start_y=0);
+            void add_enemy();
+            void maybe_add_enemy(double prob);
 
-            };
+            void add_bullet(Velocity vel);
 
-            void add_bg_particle(int16_t start_y=0) {
-                int16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
-                int16_t speed = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
-                int16_t ysped = bg_particles_gen.start_speed(bg_particles_gen.random_eng);
-                bg_particles.push_front(Particle("bg_star", Position(Vec<PositionT>(x,start_y)), Velocity(ysped-70, speed)));
-            };
+            void restart_game(bool first=false);
+            void quit_game();
+            void show_highscores();
+            void back_to_main_menu();
+            void show_credits();
 
-            void add_enemy() {
-                with_new_entity([&](Entity::Name) {
-                    int16_t x     = bg_particles_gen.start_pos  (bg_particles_gen.random_eng);
-                    double  type  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
-                    int bullet_rel = std::min(bullet_level * 2, 45);
-                    // we don't let enemies spawn too past
-                    x = std::min<int16_t>(x, res.width - 100);
-                    // we reuse the random number generator of the bg_particles, TODO: rename it
-                    if (type > 0.9) {
-                        auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(300, 2 + 0.5 * bullet_level));
-                        entity->pos = Position(x, 2);
-                        entity->vel = Velocity(0,55 + bullet_rel);
-                        entity->txt_name = "enemy_3";
-                        return entity;
-                    } else if (type > 0.4) {
-                        auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(200, 1 + 0.35 * bullet_level));
-                        entity->pos = Position(x, 2);
-                        entity->vel = Velocity(0,50 + bullet_rel);
-                        entity->txt_name = "enemy_2";
-                        return entity;
-                    } else {
-                        auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(100, 1 + 0.25 * bullet_level));
-                        entity->pos = Position(x, 5);
-                        entity->vel = Velocity(0,40 + bullet_rel);
-                        entity->txt_name =   "enemy_1";
-                        return entity;
-                    } 
-
-                });
-            };
-            void maybe_add_enemy(double prob) {
-                double  type  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
-                if (type > 1-prob) add_enemy();
-            };
-
-            void add_bullet(Velocity vel) {
-                int mx = std::min<int>(4,bullet_level);
-                std::vector<int16_t> mp {
-                                    00,
-                                    30,
-                                    60,
-                                    90,
-                                    120
-                                };
-                for (int i=1; i <= mx; i++) {
-                    with_new_entity([&](Entity::Name) {
-                        std::shared_ptr<Entity::PlayerBullet> entity = std::shared_ptr<Entity::PlayerBullet>(new Entity::PlayerBullet());
-                        entity->pos        = ent_mp[Entity::PlayerID()]->pos;
-                        entity->pos.x     += mp[i];
-                        entity->txt_name   = "player_laser";
-                        entity->vel        = vel;
-                        return entity;
-                    });
-                };
-                sdl_inf->play_sfx("player_laser");
-            }
-            void restart_game(bool first=false) {
-                Velocity vel = Velocity(0,0);
-                if (!first) vel = ent_mp[Entity::PlayerID()]->vel;
-                {
-                    with_menu([&](Menu& menu) {
-                        menu.title = "LETVEZI";
-                        menu.opts.push_back(MenuOption{"Start Game",[](GameState::Type& s) {
-                                                s.game_state = Running;
-                                            }});
-                        menu.opts.push_back(MenuOption{"High scores", [](GameState::Type& s) {
-                                                s.show_highscores();
-                                            }});
-                        menu.opts.push_back(MenuOption{"Credits",[](GameState::Type& s) {
-                                                s.show_credits();
-                                            }});
-                        menu.opts.push_back(MenuOption{"Quit Game", [](GameState::Type& s) {
-                                                s.quit_game();
-                                            }});
-                    });
-                };
-                points = 0;
-                lives  = 10;
-                bullet_level = 1;
-                til_boss = boss_rate;
-                bosses_killed = 0;
-                ent_mp.clear();
-                last_entity = Entity::Name(1);
-                ent_mp[Entity::PlayerID()] = std::shared_ptr<Entity::Type>(new Entity::Player(player_original, Velocity(0,0)));
-                for (int i=0; i<3; i++) {
-                    add_enemy();
-                };
-                maybe_add_enemy(0.5);
-                maybe_add_enemy(0.25);
-                maybe_add_enemy(0.1);
-            };
-
-            void quit_game() {
-                game_state = QuitGame;
-            };
-            void show_highscores() {
-                game_state = HighScores;
-                SDL_StartTextInput();
-            };
-            void back_to_main_menu() {
-                SDL_StopTextInput();
-                restart_game();
-            };
-
-            void show_credits() {
-                game_state = Credits;
-                credit_text_pos = Position(res.width/4, res.height + 32);
-            };
-
-            void with_menu(std::function<void(Menu&)> fn) {
-                game_state = GameMenu;
-                menu.current = 0;
-                menu.pressed = 0;
-                menu.opts.clear();
-                fn(menu);
-            };
-
-            void start_boss(int boss_id) {
-                for (int i=0; i<1+(boss_id/5); i++) {
-                    double  p  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
-                    int pos = res.width / 4 + p * 2 * res.width/4;
-                    with_new_entity([&](Entity::Name) {
-                        auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(500, 3+2*std::min(5,bullet_level)*boss_id, true));
-                        entity->pos = Position(pos, 48);
-                        entity->vel = Velocity(40,0);
-                        entity->txt_name = "enemy_boss";
-                        sdl_inf->tim.add_timer(400, EvBoss(*this, entity));
-                        return entity;
-                    });
-                };
-                for (int i=0; i<1+(boss_id * 2); i++) {
-                    double p = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
-                    int pos = res.width / 4 + p * 2 * res.width/4;
-                    with_new_entity([&](Entity::Name) {
-                        auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(500, std::min(5,boss_id), true));
-                        entity->pos = Position(pos, 48 + 64);
-                        entity->vel = Velocity(20, 100);
-                        entity->txt_name = "enemy_boss_squad";
-                        sdl_inf->tim.add_timer(400, EvBoss(*this, entity));
-                        return entity;
-                    });
-                };
-            };
-            void maybe(double prob, std::function<void()> fn) {
-                double  p  = bg_particles_gen.enemy_type (bg_particles_gen.random_eng);
-                if (p > 1-prob) fn();
-            };
-
-            void with_new_entity(std::function<std::shared_ptr<Entity::Type>(Entity::Name)> fn) {
-                 Entity::Name e = last_entity;
-                 ++last_entity;
-                 ent_mp[e] = fn(e);
-            }
-            void add_points(uint32_t p) {
-                points += p;
-                til_boss -= p;
-                if (til_boss <= 0) {
-                    start_boss(1 + bosses_killed);
-                    til_boss = (1 + bosses_killed) * boss_rate;
-                };
-            };
-            void add_life(unsigned int li) {
-                lives += li;
-                if (lives == 0) {
-                    if (points > 0) persistent_data->high_scores.add_score(persistent_data->user_data.player_name, points);
-                    show_highscores();
-                };
-            };
+            void with_menu(std::function<void(Menu&)> fn);
+            void start_boss(int boss_id);
+            void maybe(double prob, std::function<void()> fn);
+            void with_new_entity(std::function<std::shared_ptr<Entity::Type>(Entity::Name)> fn);
+            void add_points(uint32_t p);
+            void add_life(unsigned int li);
         };
     }
     namespace Events {
@@ -558,130 +381,11 @@ namespace Letvetzi {
             GameState::Type& s;
         public:
             ApplyEvent(GameState::Type& s) : s(s) {};
-            void operator()(Shoot ev) const {
-                switch (s.game_state) {
-                    case GameState::Type::Running:
-                        s.shooting = ev.key_down;
-                        {
-                           s.sdl_inf->tim.add_timer(0, Ev(s));
-                        };
-                    break;
-                    case GameState::Type::HighScores:
-                        if (!ev.key_down) break;
-                    break;
-                    case GameState::Type::GameMenu:
-                        if (!ev.key_down) break;
-                        s.menu.pressed = 150;
-                    break;
-                    case GameState::Type::Credits:
-                        if (!ev.key_down) break;
-                        s.game_state = GameState::Type::GameMenu; // we go back to the menu, whatever it was before...
-                    case GameState::Type::QuitGame:
-                        break;
-                };
-            };
-            void operator()(PlayerMove ev) const {
-                auto curr_vel = s.ent_mp[Entity::PlayerID()];
-                std::vector<int16_t> look {
-                    120,
-                    140,
-                    150,
-                    155,
-                    160,
-                    165
-                };
-                auto speed = Velocity(look[std::min(6, s.bullet_level)-1], 0);
-                auto zero  = Velocity(0,0);
-                switch (s.game_state) {
-                    case GameState::Type::Running:
-                        switch(ev.dir) {
-                            case Left:
-                                curr_vel->vel = zero-speed;
-                                break;
-                            case Right:
-                                curr_vel->vel = zero+speed;
-                                break;
-                            case StopLeft:
-                                if (curr_vel->vel.x < zero.x)
-                                    curr_vel->vel = zero;
-                                break;
-                            case StopRight:
-                                if (curr_vel->vel.x > zero.x)
-                                    curr_vel->vel = zero;
-                                break;
-                        };
-                        break;
-                    case GameState::Type::GameMenu:
-                        if (s.menu.pressed <= 0) {
-                            switch(ev.dir) {
-                                case Left:
-                                    s.menu.move(-1);
-                                    break;
-                                case Right:
-                                    s.menu.move(+1);
-                                    break;
-                                default:
-                                    break;
-                            };
-                        };
-                        break;
-                    default:
-                        break;
-                };
-            };
-            void operator()(QuitGame) const {
-                s.game_state = GameState::Type::QuitGame;
-            };
-            void operator()(TextInput txt) const {
-                if (txt.str.size() == 0) return;
-                switch (s.game_state) {
-                    case GameState::Type::HighScores:
-                        if (txt.str[0] == '\n') {
-                            s.back_to_main_menu();
-                        } else if (s.points > 0) {
-                            return;
-                        } else if (txt.str[0] == '\b') {
-                            if (s.persistent_data->user_data.player_name.size() > 0) {
-                                s.persistent_data->user_data.player_name.pop_back();
-                            };
-                        } else {
-                            s.persistent_data->user_data.player_name += txt.str;
-                        };
-                        break;
-                    default:
-                        break;
-                };
-            };
-            void operator()(EscKey) const {
-                switch (s.game_state) {
-                    case GameState::Type::Running:
-                        s.with_menu([&](GameState::Menu& menu) {
-                            menu.title = "PAUSE";
-                            menu.opts.push_back(GameState::MenuOption{"Continue playing", [](GameState::Type& s) {
-                                s.game_state = GameState::Type::Running;
-                            }});
-                            menu.opts.push_back(GameState::MenuOption{"KILL MYSELF", [](GameState::Type& s) {
-                                s.add_life(-s.lives);
-                            }});
-                            menu.opts.push_back(GameState::MenuOption{"Credits",[](GameState::Type& s) {
-                                s.show_credits();
-                            }});
-                            menu.opts.push_back(GameState::MenuOption{"Back to main menu", [](GameState::Type& s) {
-                                s.restart_game();
-                            }});
-                            menu.opts.push_back(GameState::MenuOption{"Quit game", [](GameState::Type& s) {
-                                s.quit_game();
-                            }});
-                        });
-                    break;
-                    case GameState::Type::HighScores:
-                    case GameState::Type::QuitGame:
-                    case GameState::Type::GameMenu:
-                    case GameState::Type::Credits:
-                    default:
-                    break;
-                };
-            };
+            void operator()(Shoot ev) const;
+            void operator()(PlayerMove ev) const;
+            void operator()(QuitGame) const;
+            void operator()(TextInput txt) const;
+            void operator()(EscKey) const;
         };
 
         struct Type {
