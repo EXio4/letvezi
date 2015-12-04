@@ -22,6 +22,11 @@ class VarL {
             std::lock_guard<std::mutex> mlock(mutex_);
             return fn(val);
         }
+        template <typename R>
+        auto get(std::function<R(const T&)> fn) {
+            std::lock_guard<std::mutex> mlock(mutex_);
+            return fn(val);;
+        };
 };
 
 template <typename T>

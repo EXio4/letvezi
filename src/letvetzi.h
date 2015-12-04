@@ -11,7 +11,7 @@
 #include <boost/variant.hpp>
 #include "timer.h"
 #include "vect.h"
-#include "highscores.h"
+#include "persistent.h"
 #include "game.h"
 
 namespace Letvetzi {
@@ -106,7 +106,7 @@ namespace Letvetzi {
 
         class Player : public Type {
             public:
-                int shield = 2500;
+                int32_t shield = 2500;
                 Player(Position pos_, Velocity vel_) {
                     pos = pos_;
                     vel = vel_;
@@ -284,13 +284,13 @@ namespace Letvetzi {
             int            til_boss = boss_rate;
             int            bosses_killed = 0;
             bool           shooting = false;
-            HighScores*    high_scores;
+            Persistent*    persistent_data;
 
             enum Current {
                 Running      ,
-                GameOver     ,
+                HighScores   ,
                 QuitGame     ,
-                RestartGame  ,
+//                BackToMMenu,
                 GameMenu     ,
                 Credits
             } game_state;
@@ -308,8 +308,8 @@ namespace Letvetzi {
             } bg_particles_gen;
             std::map<Entity::Name,std::shared_ptr<Entity::Type>> ent_mp;
             Entity::Name last_entity = Entity::Name(1);
-            Type(Game::Resolution res_p, Position player_p, Game::sdl_info* sdl_inf, HighScores* high_scores)
-               : high_scores(high_scores), res(res_p), player_original(player_p), sdl_inf(sdl_inf) {
+            Type(Game::Resolution res_p, Position player_p, Game::sdl_info* sdl_inf, Persistent* persistent)
+               : persistent_data(persistent), res(res_p), player_original(player_p), sdl_inf(sdl_inf) {
                 { std::random_device rd;
                   std::default_random_engine r_eg(rd());;
                   std::uniform_int_distribution<int16_t> start_pos(0, res.width); // start positions \x -> (x,0)
@@ -402,6 +402,9 @@ namespace Letvetzi {
                         menu.opts.push_back(MenuOption{"Start Game",[](GameState::Type& s) {
                                                 s.game_state = Running;
                                             }});
+                        menu.opts.push_back(MenuOption{"High scores", [](GameState::Type& s) {
+                                                s.show_highscores();
+                                            }});
                         menu.opts.push_back(MenuOption{"Credits",[](GameState::Type& s) {
                                                 s.show_credits();
                                             }});
@@ -417,7 +420,7 @@ namespace Letvetzi {
                 bosses_killed = 0;
                 ent_mp.clear();
                 last_entity = Entity::Name(1);
-                ent_mp[Entity::PlayerID()] = std::shared_ptr<Entity::Type>(new Entity::Player(player_original, vel));
+                ent_mp[Entity::PlayerID()] = std::shared_ptr<Entity::Type>(new Entity::Player(player_original, Velocity(0,0)));
                 for (int i=0; i<3; i++) {
                     add_enemy();
                 };
@@ -428,6 +431,14 @@ namespace Letvetzi {
 
             void quit_game() {
                 game_state = QuitGame;
+            };
+            void show_highscores() {
+                game_state = HighScores;
+                SDL_StartTextInput();
+            };
+            void back_to_main_menu() {
+                SDL_StopTextInput();
+                restart_game();
             };
 
             void show_credits() {
@@ -490,8 +501,8 @@ namespace Letvetzi {
             void add_life(unsigned int li) {
                 lives += li;
                 if (lives == 0) {
-                    high_scores->add_score(player_name, points);
-                    game_state = GameState::Type::GameOver;
+                    if (points > 0) persistent_data->high_scores.add_score(player_name, points);
+                    show_highscores();
                 };
             };
         };
@@ -577,7 +588,7 @@ namespace Letvetzi {
             // TODO: powerups
             if (pup.kind == PowerUp::Shield) {
                 gs.sdl_inf->play_sfx("shield_enabled");
-                pl.shield += 1000;
+                pl.shield += std::max(1500, 3000 - pl.shield/8);
             } else if (pup.kind == PowerUp::Bolt) {
                 gs.bullet_level++;
             }
@@ -682,6 +693,13 @@ namespace Letvetzi {
                 EscKey() {};
         };
 
+        class TextInput {
+        public:
+            std::string str;
+            TextInput(char ch) : str(1, ch) {};
+            TextInput(std::string str) : str(str) {};
+        };
+
         class Ev {
            private:
               GameState::Type& s;
@@ -710,9 +728,8 @@ namespace Letvetzi {
                            s.sdl_inf->tim.add_timer(0, Ev(s));
                         };
                     break;
-                    case GameState::Type::GameOver:
+                    case GameState::Type::HighScores:
                         if (!ev.key_down) break;
-                        s.game_state = GameState::Type::RestartGame;
                     break;
                     case GameState::Type::GameMenu:
                         if (!ev.key_down) break;
@@ -722,7 +739,6 @@ namespace Letvetzi {
                         if (!ev.key_down) break;
                         s.game_state = GameState::Type::GameMenu; // we go back to the menu, whatever it was before...
                     case GameState::Type::QuitGame:
-                    case GameState::Type::RestartGame:
                         break;
                 };
             };
@@ -739,9 +755,6 @@ namespace Letvetzi {
                 auto speed = Velocity(look[std::min(6, s.bullet_level)-1], 0);
                 auto zero  = Velocity(0,0);
                 switch (s.game_state) {
-                    case GameState::Type::RestartGame:
-                            s.ent_mp[Entity::PlayerID()]->vel = Velocity(0,0);
-                        break;
                     case GameState::Type::Running:
                         switch(ev.dir) {
                             case Left:
@@ -781,6 +794,26 @@ namespace Letvetzi {
             void operator()(QuitGame) const {
                 s.game_state = GameState::Type::QuitGame;
             };
+            void operator()(TextInput txt) const {
+                if (txt.str.size() == 0) return;
+                switch (s.game_state) {
+                    case GameState::Type::HighScores:
+                        if (txt.str[0] == '\n') {
+                            s.back_to_main_menu();
+                        } else if (s.points > 0) {
+                            return;
+                        } else if (txt.str[0] == '\b') {
+                            if (s.player_name.size() > 0) {
+                                s.player_name.pop_back();
+                            };
+                        } else {
+                            s.player_name += txt.str;
+                        };
+                        break;
+                    default:
+                        break;
+                };
+            };
             void operator()(EscKey) const {
                 switch (s.game_state) {
                     case GameState::Type::Running:
@@ -803,8 +836,7 @@ namespace Letvetzi {
                             }});
                         });
                     break;
-                    case GameState::Type::GameOver:
-                    case GameState::Type::RestartGame:
+                    case GameState::Type::HighScores:
                     case GameState::Type::QuitGame:
                     case GameState::Type::GameMenu:
                     case GameState::Type::Credits:
@@ -816,14 +848,14 @@ namespace Letvetzi {
 
         struct Type {
             public:
-                boost::variant<QuitGame, PlayerMove, Shoot, EscKey> data;
-            Type(boost::variant<QuitGame, PlayerMove, Shoot, EscKey> data) : data(data) {};
+                boost::variant<QuitGame, PlayerMove, Shoot, EscKey, TextInput> data;
+            Type(boost::variant<QuitGame, PlayerMove, Shoot, EscKey, TextInput> data) : data(data) {};
         };
     }
 
 
-    void event_handler(Conc::Chan<SDL_Event>&    sdl_events ,
-                       Conc::Chan<Events::Type>& game_events) {
+    void event_handler(Conc::Chan<SDL_Event>&    sdl_events   ,
+                       Conc::Chan<Events::Type>& game_events  ) {
         while(true) {
             SDL_Event ev = sdl_events.pop();
             switch(ev.type) {
@@ -842,6 +874,10 @@ namespace Letvetzi {
                                                  break;
                                 case SDLK_SPACE: game_events.push(Events::Type(Events::Shoot(true)));
                                                  break;
+                                case SDLK_BACKSPACE: game_events.push(Events::Type(Events::TextInput('\b')));
+                                                 break;
+                                case SDLK_RETURN: game_events.push(Events::Type(Events::TextInput('\n')));
+                                                 break;
                             };
                         }
                         break;
@@ -855,6 +891,9 @@ namespace Letvetzi {
                                              break;
                             default: break;
                         }
+                        break;
+                case SDL_TEXTINPUT:
+                        game_events.push(Events::Type(Events::TextInput(ev.text.text)));
                         break;
                 default: break;
             }
@@ -920,8 +959,7 @@ namespace Letvetzi {
                 uint16_t               fps_relation)
                 : sdl_inf(gs), s(s), fps_relation(fps_relation) {};
 
-            Game::LSit render_GameOver();
-            Game::LSit render_RestartGame();
+            Game::LSit render_HighScores();
             Game::LSit render_Running();
             Game::LSit render_QuitGame();
             Game::LSit render_GameMenu();
@@ -934,10 +972,6 @@ namespace Letvetzi {
 
         Game::LSit Eng::render_QuitGame() {
             return Game::BreakLoop;
-        };
-        Game::LSit Eng::render_RestartGame() {
-            s.restart_game();
-            return render_GameMenu();
         };
         Game::LSit Eng::render_Running() {
 
@@ -983,10 +1017,12 @@ namespace Letvetzi {
             };
 
             {
+                int32_t shield = dynamic_cast<Entity::Player*>(s.ent_mp[Entity::PlayerID()].get())->shield;
                 Hud hud;
                 SDL_Color txt_color = {200, 200, 200, 255}; // hud color
                 hud.start_hud = s.res.height - 64;
                 hud.add_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
+                hud.add_text(s.res.width - 512 - 32 , s.res.height - 48, txt_color, "Shield: " + std::to_string(shield));
                 hud.add_text(48, s.res.height - 48, txt_color, "Lives: ");
                 Position pos(48 + 20 * 7, s.res.height - 48);
                 for (int32_t i=0; i < s.lives; i++) {
@@ -1000,27 +1036,32 @@ namespace Letvetzi {
             return Game::KeepLooping;
         };
 
-        Game::LSit Eng::render_GameOver() {
+        Game::LSit Eng::render_HighScores() {
             {
                 Hud hud;
+                hud.start_hud = s.res.height - 64;
                 {
                     SDL_Color player_name {200,   0, 200, 255};
                     SDL_Color points      {200, 200, 200, 255};
                     hud.add_text(Position(48, 64+16), points, "High scores");
                     Position pos(64, 64+48);
-                    for (auto& r : s.high_scores->table()) {
+                    for (auto& r : s.persistent_data->high_scores.table()) {
                         hud.add_text(pos, player_name , r.name);
                         hud.add_text(pos + Position(s.res.width/3, 0) , points, std::to_string(r.points));
                         pos += Position(0,48);
                     };
+
                 };
                 SDL_Color txt_color {200, 200, 200, 255}; // hud color
-                hud.start_hud = s.res.height - 64;
-                hud.add_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
+                if (s.points > 0) {
+                    hud.add_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
+                } else {
+                    hud.add_text(s.res.width - 256 - 64 , s.res.height - 48, txt_color, "Name: " + s.player_name);
+                };
                 SDL_Color game_over_c {255, 0, 0, 255};
                 hud.add_text(48, s.res.height - 100, game_over_c, "GAME OVER");
                 SDL_Color game_over_c2 = {0,0,255,255};
-                hud.add_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press space to go back to the main menu");
+                hud.add_text(s.res.width/3, s.res.height - 48, game_over_c2, "Press [Return] to go back to the main menu");
                 render_hud(hud);
             };
             return Game::KeepLooping;
@@ -1162,11 +1203,8 @@ namespace Letvetzi {
                 eng.render_background();
                 gs.tim.advance(fps_relation);
                 switch (s.game_state) {
-                    case GameState::Type::GameOver:
-                        return eng.render_GameOver();
-                        break;
-                    case GameState::Type::RestartGame:
-                        return eng.render_RestartGame();
+                    case GameState::Type::HighScores:
+                        return eng.render_HighScores();
                         break;
                     case GameState::Type::Running:
                         return eng.render_Running();
@@ -1193,6 +1231,7 @@ namespace Letvetzi {
                 if (shield < 1000) alpha = shield/4;
                 eng.render_pic(pos - Position(10,16), "player_shield", alpha);
                 shield -= fps_rel;
+                shield = std::max(0, shield);
             };
         };
         void PlayerBullet::extra_render(GameState::Type&, Game::sdl_info&, int) {

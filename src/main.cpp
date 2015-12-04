@@ -43,7 +43,7 @@ int main() {
         gs.load_sfx("player_laser" , "art/sfx/player_laser.ogg");
         gs.load_sfx("shield_enabled", "art/sfx/player_laser.ogg");
 
-        HighScores high_scores("high_scores.dat");
+        Persistent high_scores("high_scores.dat");
         std::cout << "Trying to load high scores from high_scores.dat .. " << std::endl;
         high_scores.load();
 

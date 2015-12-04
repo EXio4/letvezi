@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -183,12 +184,13 @@ namespace Game {
                         sdl_events.push(e);
                     }
                     auto t_start = std::chrono::steady_clock::now();
-                    LSit x = render_handler(game_state, fps_relation + debt.count());
+                    LSit x = render_handler(game_state, fps_relation + debt.count() + 2);
                     switch(x) {
                         case BreakLoop: return;
                                         break;
                         default:   break;
                     }
+
                     auto t_finish = std::chrono::steady_clock::now();
                     auto dif = std::chrono::duration_cast<std::chrono::milliseconds>(t_finish - t_start);
                     auto sleep_time = std::chrono::milliseconds(fps_relation) - dif;
@@ -198,7 +200,7 @@ namespace Game {
                     debt = debt / 2;
 
                     if (sleep_time >= std::chrono::milliseconds(0)) {
-                        std::this_thread::sleep_for(sleep_time);
+                        std::this_thread::sleep_for(sleep_time-std::chrono::milliseconds(2));
                     } else {
                         /* if we are here, that means we have got a negative sleep time
                          * iow, we need to "advance" more in the next frame to make up for the slow frame we had previously
