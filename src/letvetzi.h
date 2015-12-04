@@ -277,7 +277,6 @@ namespace Letvetzi {
         int boss_rate = 25000;
         class Type {
             public:
-            std::string player_name = "YOU";
             uint64_t       points  = 0;
             int32_t        lives   = 10;
             int            bullet_level = 1;
@@ -501,7 +500,7 @@ namespace Letvetzi {
             void add_life(unsigned int li) {
                 lives += li;
                 if (lives == 0) {
-                    if (points > 0) persistent_data->high_scores.add_score(player_name, points);
+                    if (points > 0) persistent_data->high_scores.add_score(persistent_data->user_data.player_name, points);
                     show_highscores();
                 };
             };
@@ -803,11 +802,11 @@ namespace Letvetzi {
                         } else if (s.points > 0) {
                             return;
                         } else if (txt.str[0] == '\b') {
-                            if (s.player_name.size() > 0) {
-                                s.player_name.pop_back();
+                            if (s.persistent_data->user_data.player_name.size() > 0) {
+                                s.persistent_data->user_data.player_name.pop_back();
                             };
                         } else {
-                            s.player_name += txt.str;
+                            s.persistent_data->user_data.player_name += txt.str;
                         };
                         break;
                     default:
@@ -1056,7 +1055,7 @@ namespace Letvetzi {
                 if (s.points > 0) {
                     hud.add_text(s.res.width - 256 - 32 , s.res.height - 48, txt_color, "Points:  " + std::to_string(s.points));
                 } else {
-                    hud.add_text(s.res.width - 256 - 64 , s.res.height - 48, txt_color, "Name: " + s.player_name);
+                    hud.add_text(s.res.width - 256 - 64 , s.res.height - 48, txt_color, "Name: " + s.persistent_data->user_data.player_name);
                 };
                 SDL_Color game_over_c {255, 0, 0, 255};
                 hud.add_text(48, s.res.height - 100, game_over_c, "GAME OVER");

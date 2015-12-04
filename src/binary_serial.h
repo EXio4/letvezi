@@ -34,6 +34,17 @@ namespace Binary {
         void push(boost::endian::little_uint8_t x) {
             q.push(x);
         };
+        size_t size() {
+            return q.size();
+        };
+        Data splitAt(size_t x) {
+            if (x > q.size()) throw NotEnoughData("splitAt");
+            Data w;
+            for (size_t i=0; i<x; i++) {
+                w.push(getByte());
+            };
+            return w;
+        };
         template <typename FILE>
         void writeTo(FILE& f) {
             while (!q.empty()) {
@@ -98,14 +109,7 @@ namespace Binary {
     Data serialize(T x) {
         typedef typename data_int<T>::endian ENDIAN_T;
         ENDIAN_T w = x;
-        return Data(sizeof(ENDIAN_T)/sizeof(data_int<uint8_t>::endian) , (data_int<uint8_t>::endian *)&w);
-    };
-    template<> Data serialize(std::string str) {
-        Data w = serialize<uint8_t>(str.size());
-        for (auto& c : str) {
-            w += serialize<uint8_t>(c);
-        };
-        return w;
+        return Data(sizeof(ENDIAN_T)/sizeof(data_int<uint8_t>::endian) , (data_int<uint8_t>::endian *)w.data());
     };
 
     template <typename T>
@@ -119,11 +123,19 @@ namespace Binary {
         };
         return (T)*(ENDIAN_T*)&arr;
     };
+
+    template<> Data serialize(std::string str) {
+        Data w = serialize<uint32_t>(str.size());
+        for (auto& c : str) {
+            w += serialize<uint8_t>(c);
+        };
+        return w;
+    };
     template<> std::string deserialize(Data& d) {
         std::string str = "";
         {
-            auto size = deserialize<uint8_t>(d);
-            for (auto j=0; j<size; j++) {
+            auto size = deserialize<uint32_t>(d);
+            for (uint32_t j=0; j<size; j++) {
                 str.push_back(Binary::deserialize<uint8_t>(d));
             };
         };

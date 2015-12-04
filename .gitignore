@@ -29,3 +29,6 @@
 
 # Build files
 build/*
+
+# Game stuff
+user_info.dat
