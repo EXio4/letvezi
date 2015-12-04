@@ -1,7 +1,7 @@
 
 DIR = src/
 
-OBJS = src/main.cpp src/game.cpp
+OBJS = src/main.cpp src/game.cpp src/persistent.cpp src/binary_serial.cpp
 
 OBJ_NAME = build/game
 
