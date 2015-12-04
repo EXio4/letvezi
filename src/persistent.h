@@ -112,7 +112,7 @@ void Persistent::HighScores::add_score(std::string player_name, uint64_t points)
         [CHUNK_DATA]        data from the chunk
     there are (currently) two kinds of chunks
         chunk_type = 0x01 (Player Configuration)
-        chunk_type = 0x11 (High scores)
+        chunk_type = 0x02 (High scores)
 */
 
 uint32_t persistent_magic_number = 0x13423701;
