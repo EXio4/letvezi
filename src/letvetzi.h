@@ -10,12 +10,20 @@
 #include <functional>
 #include <memory>
 #include <boost/variant.hpp>
+#include <boost/optional.hpp>
+#include "inline_variant.hpp"
 #include "timer.h"
 #include "vect.h"
 #include "persistent.h"
 #include "game.h"
 
 namespace Letvetzi {
+    template <typename T>
+    std::shared_ptr<T> inline mk_shared(T&& w) {
+        std::shared_ptr<T> x = std::shared_ptr<T>(new T(w));
+        x->this_ = x;
+        return x;
+    };
     struct VelocityT {
         typedef int16_t scalar;
     };
@@ -39,6 +47,14 @@ namespace Letvetzi {
 
     namespace GameState {
         class Type;
+        struct S_Running;
+        struct S_HighScores;
+        struct S_Credits;
+        struct S_Menu;
+        struct S_QuitGame;
+        template <typename... Ts>
+        using variant = boost::variant<std::shared_ptr<Ts>...>;
+        using MState = variant<S_Menu, S_Running, S_HighScores, S_Credits, S_QuitGame>;
     };
 
     namespace Entity {
@@ -70,7 +86,9 @@ namespace Letvetzi {
             };
         };
 
-        Name PlayerID();
+        Name inline PlayerID() {
+            return Name(0);
+        };
 
         class Type {
             public:
@@ -83,8 +101,8 @@ namespace Letvetzi {
                     killed = true;
                 };
 
-                virtual void extra_render(GameState::Type&, Game::sdl_info&, int) = 0;
-                virtual void out_of_screen(GameState::Type&) = 0;
+                virtual void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int) = 0;
+                virtual void out_of_screen(std::shared_ptr<GameState::S_Running>) = 0;
         };
 
         class PowerUp : public Type {
@@ -94,8 +112,8 @@ namespace Letvetzi {
                 Bolt   ,
             } kind;
             PowerUp(Type kind) : kind(kind) {};
-            void extra_render(GameState::Type&, Game::sdl_info&, int);
-            void out_of_screen(GameState::Type&);
+            void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
+            void out_of_screen(std::shared_ptr<GameState::S_Running>);
         };
 
         class Player : public Type {
@@ -106,16 +124,16 @@ namespace Letvetzi {
                     vel = vel_;
                     txt_name = "player";
                 };
-                void extra_render(GameState::Type&, Game::sdl_info&, int);
-                void out_of_screen(GameState::Type&) {}; // impossible
+                void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
+                void out_of_screen(std::shared_ptr<GameState::S_Running>) {}; // impossible
         };
 
         class PlayerBullet : public Type {
             public:
                 PlayerBullet() {};
 
-                void extra_render(GameState::Type&, Game::sdl_info&, int);
-                void out_of_screen(GameState::Type&);
+                void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
+                void out_of_screen(std::shared_ptr<GameState::S_Running>);
 
         };
 
@@ -128,21 +146,22 @@ namespace Letvetzi {
                 Enemy(int score, int health, bool boss=false) : score(score), health(health), boss(boss) {};
                 Enemy() {};
 
-                void extra_render(GameState::Type&, Game::sdl_info&, int);
-                void out_of_screen(GameState::Type&);
+                void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
+                void out_of_screen(std::shared_ptr<GameState::S_Running>);
         };
 
         class EnemyBullet : public Type {
             public:
                 EnemyBullet() {};
 
-                void extra_render(GameState::Type&, Game::sdl_info&, int);
-                void out_of_screen(GameState::Type&);
+                void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
+                void out_of_screen(std::shared_ptr<GameState::S_Running>);
         };
+
 
         class Collision {
             public:
-            bool operator()(GameState::Type& gs, std::shared_ptr<Type> x_sp, std::shared_ptr<Type> y_sp) {
+            bool operator()(std::shared_ptr<GameState::S_Running> gs, std::shared_ptr<Type> x_sp, std::shared_ptr<Type> y_sp) {
                 Type* x = x_sp.get();
                 Type* y = y_sp.get();
                 if (auto x_ = dynamic_cast<Enemy*>(x)) {
@@ -210,40 +229,41 @@ namespace Letvetzi {
             };
 
             // player vs the world
-            bool on_collision(GameState::Type&   , Player&         , Enemy&          );
-            bool on_collision(GameState::Type&   , Player&         , PlayerBullet&   );
-            bool on_collision(GameState::Type&   , Player&         , Player&         );
-            bool on_collision(GameState::Type&   , Player&         , EnemyBullet&    );
-            bool on_collision(GameState::Type&   , Player&         , PowerUp&        );
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , Player&         , Enemy&          );
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , Player&         , PlayerBullet&   );
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , Player&         , Player&         );
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , Player&         , EnemyBullet&    );
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , Player&         , PowerUp&        );
             // enemy vs the world
-            bool on_collision(GameState::Type&   , Enemy&          , Enemy&          );
-            bool on_collision(GameState::Type&   , Enemy&          , PlayerBullet&   );
-            bool on_collision(GameState::Type& g , Enemy&        x , Player&       y ) { return on_collision(g,y,x); };
-            bool on_collision(GameState::Type&   , Enemy&          , EnemyBullet&    );
-            bool on_collision(GameState::Type&   , Enemy&          , PowerUp&        );
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , Enemy&          , Enemy&          );
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , Enemy&          , PlayerBullet&   );
+            bool on_collision(std::shared_ptr<GameState::S_Running> g , Enemy&        x , Player&       y ) { return on_collision(g,y,x); };
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , Enemy&          , EnemyBullet&    );
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , Enemy&          , PowerUp&        );
             // player_bullet vs the world
-            bool on_collision(GameState::Type& g , PlayerBullet& x , Enemy&        y ) { return on_collision(g,y,x); };
-            bool on_collision(GameState::Type&   , PlayerBullet&   , PlayerBullet&   );
-            bool on_collision(GameState::Type& g , PlayerBullet& x , Player&       y ) { return on_collision(g,y,x); };
-            bool on_collision(GameState::Type&   , PlayerBullet&   , EnemyBullet&    );
-            bool on_collision(GameState::Type&   , PlayerBullet&   , PowerUp&        );
+            bool on_collision(std::shared_ptr<GameState::S_Running> g , PlayerBullet& x , Enemy&        y ) { return on_collision(g,y,x); };
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , PlayerBullet&   , PlayerBullet&   );
+            bool on_collision(std::shared_ptr<GameState::S_Running> g , PlayerBullet& x , Player&       y ) { return on_collision(g,y,x); };
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , PlayerBullet&   , EnemyBullet&    );
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , PlayerBullet&   , PowerUp&        );
             // enemy_bullet vs the world
-            bool on_collision(GameState::Type& g , EnemyBullet&  x , Enemy&        y ) { return on_collision(g,y,x); };
-            bool on_collision(GameState::Type& g , EnemyBullet&  x , PlayerBullet& y ) { return on_collision(g,y,x); };
-            bool on_collision(GameState::Type& g , EnemyBullet&  x , Player&       y ) { return on_collision(g,y,x); };
-            bool on_collision(GameState::Type&   , EnemyBullet&    , EnemyBullet&    );
-            bool on_collision(GameState::Type&   , EnemyBullet&    , PowerUp&        );
+            bool on_collision(std::shared_ptr<GameState::S_Running> g , EnemyBullet&  x , Enemy&        y ) { return on_collision(g,y,x); };
+            bool on_collision(std::shared_ptr<GameState::S_Running> g , EnemyBullet&  x , PlayerBullet& y ) { return on_collision(g,y,x); };
+            bool on_collision(std::shared_ptr<GameState::S_Running> g , EnemyBullet&  x , Player&       y ) { return on_collision(g,y,x); };
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , EnemyBullet&    , EnemyBullet&    );
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , EnemyBullet&    , PowerUp&        );
             // power up vs the world
-            bool on_collision(GameState::Type& g , PowerUp&      x , Enemy&        y ) { return on_collision(g,y,x); };
-            bool on_collision(GameState::Type& g , PowerUp&      x , PlayerBullet& y ) { return on_collision(g,y,x); };
-            bool on_collision(GameState::Type& g , PowerUp&      x , Player&       y ) { return on_collision(g,y,x); };
-            bool on_collision(GameState::Type& g , PowerUp&      x , EnemyBullet&  y ) { return on_collision(g,y,x); };
-            bool on_collision(GameState::Type&   , PowerUp&        , PowerUp&        );
+            bool on_collision(std::shared_ptr<GameState::S_Running> g , PowerUp&      x , Enemy&        y ) { return on_collision(g,y,x); };
+            bool on_collision(std::shared_ptr<GameState::S_Running> g , PowerUp&      x , PlayerBullet& y ) { return on_collision(g,y,x); };
+            bool on_collision(std::shared_ptr<GameState::S_Running> g , PowerUp&      x , Player&       y ) { return on_collision(g,y,x); };
+            bool on_collision(std::shared_ptr<GameState::S_Running> g , PowerUp&      x , EnemyBullet&  y ) { return on_collision(g,y,x); };
+            bool on_collision(std::shared_ptr<GameState::S_Running>   , PowerUp&        , PowerUp&        );
             // fuck up, this is a lot of boilerplate
         };
     };
 
     namespace GameState {
+
         struct MenuOption {
             std::string text;
             std::function<void(GameState::Type&)> callback;
@@ -258,69 +278,118 @@ namespace Letvetzi {
             };
         };
 
-        class EvBoss {
-          private:
-             Type& s;
-             std::shared_ptr<Entity::Type> en;
-          public:
-            EvBoss(Type& s, std::shared_ptr<Entity::Type> en) : s(s), en(en) {};
-            void operator() ();
-        };
-
+        Menu MainMenu(); 
 
         extern int boss_rate;
-        class Type {
-            public:
-            uint64_t       points  = 0;
-            int32_t        lives   = 10;
-            int            bullet_level = 1;
-            int            til_boss = boss_rate;
-            int            bosses_killed = 0;
-            bool           shooting = false;
-            Persistent*    persistent_data;
 
-            enum Current {
-                Running      ,
-                HighScores   ,
-                QuitGame     ,
-//                BackToMMenu,
-                GameMenu     ,
-                Credits
-            } game_state;
-            Menu menu;
-            Game::Resolution res;
-            Position credit_text_pos = Position(32,60);
-            Position player_original;
-            Game::sdl_info* sdl_inf;
-            std::list<Particle> bg_particles;
-            struct {
-                std::default_random_engine random_eng;
-                std::uniform_int_distribution<int16_t> start_pos;
-                std::uniform_int_distribution<int16_t> start_speed;
-                std::uniform_real_distribution<double> enemy_type;
-            } bg_particles_gen;
+        struct S_Running {
+            Type& parent;
+            std::shared_ptr<S_Running> this_;
+            uint64_t points = 0;
+            int32_t  lives  = 10;
+            int32_t  bullet_level  = 1;
+            int32_t  til_boss      = boss_rate;
+            int32_t  bosses_killed = 0;
+            bool shooting = false;
             std::map<Entity::Name,std::shared_ptr<Entity::Type>> ent_mp;
             Entity::Name last_entity = Entity::Name(1);
-            Type(Game::Resolution res_p, Position player_p, Game::sdl_info* sdl_inf, Persistent* persistent);
-
-            void add_bg_particle(int16_t start_y=0);
+            S_Running(Type& parent);
             void add_enemy();
-            void maybe_add_enemy(double prob);
-
-            void add_bullet(Velocity vel);
-
-            void restart_game(bool first=false);
-            void quit_game();
-            void show_highscores();
-            void back_to_main_menu();
-            void show_credits();
-
-            void with_menu(std::function<void(Menu&)> fn);
+            void maybe_add_enemy(double);
+            void add_bullet(Velocity);
             void start_boss(int boss_id);
-            void maybe(double prob, std::function<void()> fn);
             void with_new_entity(std::function<std::shared_ptr<Entity::Type>(Entity::Name)> fn);
             void add_points(uint32_t p);
             void add_life(unsigned int li);
+
+        };
+        struct S_HighScores {
+            Type& parent;
+            std::shared_ptr<S_HighScores> this_;
+            boost::optional<uint64_t> points;
+            MState   previous;
+            S_HighScores(Type& p, MState prev) : parent(p), points(boost::none), previous(prev) {};
+            S_HighScores(Type& p, MState prev, uint64_t points) : parent(p), points(points), previous(prev) {};
+        };
+        struct S_Credits    {
+            Type& parent;
+            std::shared_ptr<S_Credits> this_;
+            Position text_pos;
+            MState   previous;
+            S_Credits(Type& parent, MState prev);
+        };
+        struct S_Menu {
+            Type& parent;
+            std::shared_ptr<S_Menu> this_;
+            Menu menu;
+            S_Menu(Type& parent, Menu menu) : parent(parent), menu(menu) {};
+        };
+        struct S_QuitGame {
+            std::shared_ptr<S_QuitGame> this_;
+        };
+
+        class Type {
+            public:
+            struct Common {
+                std::shared_ptr<Persistent> persistent;
+                std::shared_ptr<Game::sdl_info> sdl_inf;
+                struct {
+                    std::default_random_engine random_eng;
+                    std::uniform_int_distribution<int16_t> i_dis_0_width;
+                    std::uniform_int_distribution<int16_t> i_dis_40_100;
+                    std::uniform_real_distribution<double> d_dis_0_1;
+                } rng;
+
+                Game::Resolution res;
+                std::list<Particle> bg_particles;
+                struct {
+                    Position player_original;
+                } cnt;
+                Common(std::shared_ptr<Persistent> persistent, std::shared_ptr<Game::sdl_info> sdl_inf, Game::Resolution res, Position player_original) : persistent(persistent), sdl_inf(sdl_inf), res(res), cnt{player_original} {
+                    { std::random_device rd;
+                        std::default_random_engine r_eg(rd());;
+                        std::uniform_int_distribution<int16_t> start_pos(0, res.width); // start positions \x -> (x,0)
+                        std::uniform_int_distribution<int16_t> start_speed(40,100); // speed
+                        std::uniform_real_distribution<double> enemy_type(0,1); // enemy typ[e
+                        rng.random_eng = r_eg;
+                        rng.i_dis_0_width = start_pos;
+                        rng.i_dis_40_100  = start_speed;
+                        rng.d_dis_0_1     = enemy_type;
+                    };
+                    for (int i=0; i<res.width/20; i++) {
+                        add_bg_particle((i*100)%res.height);
+                    };
+                }
+                void add_bg_particle(int16_t y=2);
+            } common;
+
+            std::shared_ptr<MState> ms;
+
+            Type(std::shared_ptr<Persistent> persistent, std::shared_ptr<Game::sdl_info> sdl_inf, Game::Resolution res, Position player_original) : common(persistent, sdl_inf, res, player_original), ms (std::make_shared<MState>((mk_shared<S_Menu>(S_Menu(*this, MainMenu()))))) {
+            };
+
+            void main_menu() {
+                with_menu(MainMenu);
+            };
+            void with_menu(std::function<Menu()> fn) {
+                *ms = mk_shared<S_Menu>(S_Menu(*this, fn()));
+            };
+            void start_game() {
+                *ms = mk_shared<S_Running>(S_Running(*this));
+            };
+            void high_scores() {
+                *ms = mk_shared<S_HighScores>(S_HighScores(*this, *ms));
+            };
+            void high_scores(uint64_t points) {
+                *ms = mk_shared<S_HighScores>(S_HighScores(*this, *ms, points));
+            };
+            void quit_game() {
+                *ms = mk_shared<S_QuitGame>(S_QuitGame());
+            };
+            void credits() {
+                *ms = mk_shared<S_Credits>(S_Credits(*this, *ms));
+            };
+            void maybe(double prob, std::function<void()> fn);
         };
     }
     namespace Events {
@@ -367,12 +436,19 @@ namespace Letvetzi {
            public:
               Ev(GameState::Type& s) : s(s) { };
               void operator() () {
-                 if (s.game_state == GameState::Type::Running && s.shooting) {
-                     Velocity vel = Velocity(0,-120);
-                     vel = (1 + 0.4 * std::min(5,s.bullet_level)) * vel;
-                     s.add_bullet(vel);
-                     s.sdl_inf->tim.add_timer(100, *this);
-                 };
+                  match(*s.ms,
+                        [&](std::shared_ptr<GameState::S_Running> run) {
+                            if (run->shooting) {
+                                Velocity vel = Velocity(0,-120);
+                                vel = (1 + 0.4 * std::min(5,run->bullet_level)) * vel;
+                                run->add_bullet(vel);
+                                s.common.sdl_inf->tim.add_timer(100, *this);
+                            };
+                        },
+                        [](std::shared_ptr<GameState::S_HighScores>){},
+                        [](std::shared_ptr<GameState::S_QuitGame  >){},
+                        [](std::shared_ptr<GameState::S_Menu      >){},
+                        [](std::shared_ptr<GameState::S_Credits   >){});
               };
         };
 
@@ -437,30 +513,41 @@ namespace Letvetzi {
         class Eng { /* this is probably a good fit for inheritance
                        but adding indirections with pointers/reference is boring */
         private:
-            Game::sdl_info&    sdl_inf;
+            std::shared_ptr<Game::sdl_info> sdl_inf;
             GameState::Type&   s;
             uint16_t           fps_relation;
 
         public:
-            Eng(Game::sdl_info&        gs          ,
-                GameState::Type&       s           ,
-                uint16_t               fps_relation)
-                : sdl_inf(gs), s(s), fps_relation(fps_relation) {};
+            Eng(std::shared_ptr<Game::sdl_info>  sdl_inf     ,
+                GameState::Type&                 s           ,
+                uint16_t                         fps_relation)
+                : sdl_inf(sdl_inf), s(s), fps_relation(fps_relation) {};
 
-            Game::LSit render_HighScores();
-            Game::LSit render_Running();
-            Game::LSit render_QuitGame();
-            Game::LSit render_GameMenu();
-            Game::LSit render_Credits();
+            Game::LSit render_HighScores(std::shared_ptr<GameState::S_HighScores>);
+            Game::LSit render_Running   (std::shared_ptr<GameState::S_Running   >);
+            Game::LSit render_QuitGame  (std::shared_ptr<GameState::S_QuitGame  >);
+            Game::LSit render_Menu      (std::shared_ptr<GameState::S_Menu      >);
+            Game::LSit render_Credits   (std::shared_ptr<GameState::S_Credits   >);
 
             void render_pic(Position, std::string,uint8_t alpha=255);
             void render_background();
             void render_hud(const Hud&);
         };
 
-        Game::LSit handler_game(Game::sdl_info&              gs,
-                                Conc::VarL<GameState::Type>& svar,
-                                uint16_t                     fps_relation);
+        Game::LSit inline handler_game(std::shared_ptr<Game::sdl_info> gs,
+                                Conc::VarL<GameState::Type>&    svar,
+                                uint16_t                        fps_relation) {
+            return svar.modify([&](GameState::Type& s) {
+                Eng eng(gs, s, fps_relation);
+                eng.render_background();
+                gs->tim.advance(fps_relation);
+                return match(*(s.ms)
+                            , [&](std::shared_ptr<GameState::S_HighScores> x) { return eng.render_HighScores(x); }
+                            , [&](std::shared_ptr<GameState::S_Running   > x) { return eng.render_Running   (x); }
+                            , [&](std::shared_ptr<GameState::S_QuitGame  > x) { return eng.render_QuitGame  (x); }
+                            , [&](std::shared_ptr<GameState::S_Menu      > x) { return eng.render_Menu      (x); }
+                            , [&](std::shared_ptr<GameState::S_Credits   > x) { return eng.render_Credits   (x); });
+            });
+        };
     };
-
 }

@@ -115,6 +115,22 @@ namespace Binary {
         return (T)*(ENDIAN_T*)&arr;
     };
 
-    template<> Data serialize(std::string);
-    template<> std::string deserialize(Data&);
+
+    template<> inline Data serialize(std::string str) {
+        Data w = serialize<uint32_t>(str.size());
+        for (auto& c : str) {
+            w += serialize<uint8_t>(c);
+        };
+        return w;
+    };
+    template<> inline std::string deserialize(Data& d) {
+        std::string str = "";
+        {
+            auto size = deserialize<uint32_t>(d);
+            for (uint32_t j=0; j<size; j++) {
+                str.push_back(Binary::deserialize<uint8_t>(d));
+            };
+        };
+        return str;
+    };
 };
