@@ -1,7 +1,7 @@
 #include "game.h"
 
 namespace Game {
-    sdl_info::sdl_info(const char* game_name, std::string font_name, std::string bg_name, int fps_param) {
+    sdl_info::sdl_info(const char* game_name, std::string font_name, int fps_param) {
             window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
             if (window == NULL) { throw SDLError(); }
             win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED );
@@ -9,9 +9,7 @@ namespace Game {
             fonts[Small]  = TTF_OpenFont(font_name.c_str(), 20);
             fonts[Normal] = TTF_OpenFont(font_name.c_str(), 24);
             fonts[Huge]   = TTF_OpenFont(font_name.c_str(), 32);
-            music = Mix_LoadMUS(bg_name.c_str());
-            Mix_PlayMusic(music, -1);
-            Mix_VolumeMusic(MIX_MAX_VOLUME / 4);
+            gm_name = game_name;
     }
     sdl_info::~sdl_info() {
         for (const auto& pair : txts) {
@@ -21,11 +19,21 @@ namespace Game {
     }
 
     Resolution sdl_info::get_current_res() {
+        std::lock_guard<std::mutex> mlock(mutex_);
         SDL_DisplayMode current;
         SDL_GetCurrentDisplayMode(0, &current); // we assume nothing goes wrong..
         return Resolution(current.w, current.h);
     };
+
+    void sdl_info::set_background(std::string bg_name) {
+            std::lock_guard<std::mutex> mlock(mutex_);
+            music = Mix_LoadMUS(bg_name.c_str());
+            Mix_PlayMusic(music, -1);
+            Mix_VolumeMusic(MIX_MAX_VOLUME / 4);
+    };
+
     void sdl_info::load_png(std::string key, std::string path) {
+            std::lock_guard<std::mutex> mlock(mutex_);
             {
             auto it = txts.find(key);
             if (it != txts.end()) return;
@@ -40,14 +48,17 @@ namespace Game {
     }
 
     void sdl_info::load_sfx(std::string key, std::string path) {
+        std::lock_guard<std::mutex> mlock(mutex_);
         sfx[key] = Mix_LoadWAV(path.c_str());
     };
 
     void sdl_info::play_sfx(std::string key) {
+        std::lock_guard<std::mutex> mlock(mutex_);
         Mix_PlayChannel(-1, sfx[key], 0);
     };
 
     void sdl_info::render_text(int x, int y, FontID f_id, SDL_Color txt_color, std::string text) {
+        std::lock_guard<std::mutex> mlock(mutex_);
         SDL_Rect  pos;
         SDL_Surface* textSurface = TTF_RenderUTF8_Solid(fonts[f_id], text.c_str(), txt_color);
         SDL_Texture* textTexture = SDL_CreateTextureFromSurface(win_renderer, textSurface);
