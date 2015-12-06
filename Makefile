@@ -1,16 +1,23 @@
 
-DIR = -I src/ -I libs/
+SOURCES = src/main.cpp src/game.cpp src/letvetzi.cpp src/persistent.cpp src/binary_serial.cpp
+OBJECTS = $(SOURCES:.cpp=.o)
+EXECUTABLE = build/letvezi
 
-OBJS = src/main.cpp src/game.cpp src/letvetzi.cpp src/persistent.cpp src/binary_serial.cpp
+LDFLAGS = -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lpthread
 
-OBJ_NAME = build/game
+INCLUDES = -I src/ -I libs/
 
-LIBS = -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lpthread
-
-WARNS = -Wall -Wextra -Werror "-Wno-\#warnings"
+CXXFLAGS = -std=c++14 -O0 -g -Wall -Wextra -Werror $(INCLUDES)
 
 CXX = clang++
 
-all : $(OBJS)
+all : $(OBJECTS) $(EXECUTABLE)
+$(EXECUTABLE): $(OBJECTS)
 	mkdir -p build/
-	$(CXX) -std=c++14 $(OBJS) -g -O0 $(WARNS) $(DIR) $(LIBS) -o $(OBJ_NAME)
+	$(CXX) ${LDFLAGS} ${CXXFLAGS} ${OBJECTS} -o $(EXECUTABLE)
+
+.cpp.o:
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+clean:
+	rm -f ${EXECUTABLE} ${OBJECTS}
