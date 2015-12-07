@@ -1,6 +1,6 @@
 
-SOURCES = src/main.cpp src/game.cpp src/render.cpp src/letvetzi.cpp src/persistent.cpp src/binary_serial.cpp
-HEADERS = src/game.h src/render.h src/letvetzi.h src/persistent.h src/binary_serial.h src/timer.h src/conc.h src/vect.h
+SOURCES = src/main.cpp src/game.cpp src/render.cpp src/letvezi.cpp src/persistent.cpp src/binary_serial.cpp
+HEADERS = src/game.h src/render.h src/letvezi.h src/persistent.h src/binary_serial.h src/timer.h src/conc.h src/vect.h
 OBJECTS = $(SOURCES:.cpp=.o)
 
 EXECUTABLE = build/letvezi
@@ -27,7 +27,7 @@ src/game.o: src/game.cpp $(HEADERS)
 src/render.o: src/render.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-src/letvetzi.o: src/letvetzi.cpp $(HEADERS)
+src/letvezi.o: src/letvezi.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 src/persistent.o: src/persistent.cpp $(HEADERS)

@@ -8,7 +8,7 @@
 #include <random>
 #include <algorithm>
 #include "game.h"
-#include "letvetzi.h"
+#include "letvezi.h"
 #include "render.h"
 
 #ifdef _WIN32
@@ -26,7 +26,7 @@ int main() {
         if(Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
             printf("Error starting SDL_Mix: %s\n", Mix_GetError());
         }
-        auto gs = std::make_shared<Game::sdl_info>("Letvetzi", "art/font.ttf");
+        auto gs = std::make_shared<Game::sdl_info>("Letvezi", "art/font.ttf");
         gs->loading_screen([](auto& ch) {
             auto set_bg   = [&](std::string file) {
                                 ch.push( boost::optional<std::tuple<std::string,std::function<void(Game::sdl_info&)>>>(
@@ -87,17 +87,17 @@ int main() {
         persistent->load();
 
         Game::Resolution res = gs->get_current_res();
-        Letvetzi::GameState::Type start_state =
-                   Letvetzi::GameState::Type(persistent, gs, res,
-                            Letvetzi::Position(res.width/2, res.height-70-gs->textures().at("player").height));
+        Letvezi::GameState::Type start_state =
+                   Letvezi::GameState::Type(persistent, gs, res,
+                            Letvezi::Position(res.width/2, res.height-70-gs->textures().at("player").height));
 
-        std::function<void(Conc::Chan<SDL_Event>&,Conc::Chan<Letvetzi::Events::Type>&)> event_fn =
-                Letvetzi::event_handler;
-        std::function<void(Conc::Chan<Letvetzi::Events::Type>&,Conc::VarL<Letvetzi::GameState::Type>&)> game_fn =
-                Letvetzi::game_handler;
-        std::function<Game::LSit(Conc::VarL<Letvetzi::GameState::Type>&,uint16_t)> render_fn =
-                [gs](Conc::VarL<Letvetzi::GameState::Type>& typ,uint16_t fps_rel) {
-                            return Letvetzi::Render::handler_game(gs,typ,fps_rel);
+        std::function<void(Conc::Chan<SDL_Event>&,Conc::Chan<Letvezi::Events::Type>&)> event_fn =
+                Letvezi::event_handler;
+        std::function<void(Conc::Chan<Letvezi::Events::Type>&,Conc::VarL<Letvezi::GameState::Type>&)> game_fn =
+                Letvezi::game_handler;
+        std::function<Game::LSit(Conc::VarL<Letvezi::GameState::Type>&,uint16_t)> render_fn =
+                [gs](Conc::VarL<Letvezi::GameState::Type>& typ,uint16_t fps_rel) {
+                            return Letvezi::Render::handler_game(gs,typ,fps_rel);
                         };
 
         gs->loop(event_fn, game_fn, render_fn, start_state);

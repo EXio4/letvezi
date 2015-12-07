@@ -17,7 +17,7 @@
 #include "persistent.h"
 #include "game.h"
 
-namespace Letvetzi {
+namespace Letvezi {
     template <typename T>
     std::shared_ptr<T> inline mk_shared(T&& w) {
         std::shared_ptr<T> x = std::shared_ptr<T>(new T(w));

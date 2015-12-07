@@ -1,7 +1,7 @@
 #pragma once
-#include "letvetzi.h"
+#include "letvezi.h"
 
-namespace Letvetzi {
+namespace Letvezi {
 
    /* fps_relation, 1000 = 1s
      * 
