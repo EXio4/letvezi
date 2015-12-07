@@ -10,6 +10,7 @@
 #include <future>
 #include <mutex>
 #include <stdexcept>
+#include <boost/optional.hpp>
 #include "conc.h"
 #include "timer.h"
 
@@ -62,7 +63,6 @@ namespace Game {
     class sdl_info {
     private:
             uint16_t fps = 60; /* fps >= 0 */
-            std::mutex mutex_;
             std::map<std::string, TextureInfo>  txts;
             std::map<FontID,TTF_Font*> fonts;
             std::map<std::string, Mix_Chunk*> sfx;
@@ -89,22 +89,17 @@ namespace Game {
 
             template <typename FN>
             void loading_screen(FN&& fn) {
+                using LoadCB = boost::optional<std::function<void(sdl_info&)>>;
                 Resolution res = get_current_res();
-                int i = 180;
                 int start_y   = res.height/4;
                 int finish_y  = 3 * start_y;
                 int current_y = start_y;
                 int accel = 32;
-                auto future = std::async(std::launch::async, fn);
+                Conc::Chan<LoadCB> chan;
+                fn(chan);
                 while (1) {
-                    auto status = future.wait_for(std::chrono::milliseconds(0));
-                    if (i <= 0 && status == std::future_status::ready) break;
-                    {
-                        std::lock_guard<std::mutex> mlock(mutex_);
-                        SDL_SetRenderDrawColor(win_renderer, 0, 0, 0, 255);
-                        SDL_RenderClear(win_renderer);
-
-                    };
+                    SDL_SetRenderDrawColor(win_renderer, 0, 0, 0, 255);
+                    SDL_RenderClear(win_renderer);
                     SDL_Color color = {255, 0, 255, 255};
                     render_text(res.width/4, res.height/4, Huge, color, gm_name);
 
@@ -113,21 +108,22 @@ namespace Game {
                     if (current_y > finish_y || current_y < start_y) accel *= -1;
                     current_y += accel;
 
-                    {
-                        std::lock_guard<std::mutex> mlock(mutex_);
-                        SDL_RenderPresent(win_renderer);
-                    }
-
-                    std::this_thread::sleep_for(std::chrono::milliseconds(16));
-                    i--;
-                };
-                {
-                    std::lock_guard<std::mutex> mlock(mutex_);
-                    SDL_SetRenderDrawColor(win_renderer, 0, 0, 0, 255);
-                    SDL_RenderClear(win_renderer);
                     SDL_RenderPresent(win_renderer);
+
+                    {
+                        auto t_start = std::chrono::steady_clock::now();
+                        LoadCB x = chan.pop();
+                        if (!x) break;
+                        (*x)(*this);
+                        auto t_finish = std::chrono::steady_clock::now();
+                        auto diff = t_finish - t_start;
+                        std::this_thread::sleep_for(std::chrono::milliseconds(16) - diff);
+                    };
                 };
-                future.get();
+                SDL_SetRenderDrawColor(win_renderer, 0, 0, 0, 255);
+                SDL_RenderClear(win_renderer);
+                SDL_RenderPresent(win_renderer);
+                std::cout << "Game loaded" << std::endl;
             };
 
             void render_text(int x, int y, FontID f_id, SDL_Color txt_color, std::string text);

@@ -23,31 +23,44 @@ int main() {
             printf("Error starting SDL_Mix: %s\n", Mix_GetError());
         }
         auto gs = std::make_shared<Game::sdl_info>("Letvetzi", "art/font.ttf");
-        gs->loading_screen([&]() {
+        gs->loading_screen([](auto& ch) {
+            auto set_bg   = [&](std::string file) {
+                                ch.push( boost::optional<std::function<void(Game::sdl_info&)>>([file](auto& gs) { gs.set_background(file); }));
+                            };
+            auto load_sfx = [&](std::string key, std::string file) {
+                                ch.push( boost::optional<std::function<void(Game::sdl_info&)>>([key,file](auto& gs) { gs.load_sfx(key,file); }));
+                            };
+            auto load_png = [&](std::string key, std::string file) {
+                                ch.push( boost::optional<std::function<void(Game::sdl_info&)>>([key,file](auto& gs) { gs.load_png(key,file); }));
+                            };
+            auto end = [&]() {
+                                ch.push( boost::none );
+                            };
 
-            gs->set_background("art/background.ogg");
 
-            gs->load_png("bg_star"      , "art/img/bg_star.png");
+            set_bg("art/background.ogg");
 
-            gs->load_png("player"       , "art/img/player.png");
-            gs->load_png("player_laser" , "art/img/player_laser.png");
-            gs->load_png("player_life"  , "art/img/player_life.png");
-            gs->load_png("player_shield", "art/img/player_shield.png");
+            load_png("bg_star"         , "art/img/bg_star.png"            );
 
-            gs->load_png("enemy_1"      , "art/img/enemy_1.png");
-            gs->load_png("enemy_2"      , "art/img/enemy_2.png");
-            gs->load_png("enemy_3"      , "art/img/enemy_3.png");
-            gs->load_png("enemy_boss"   , "art/img/enemy_boss.png");
-            gs->load_png("enemy_laser"  , "art/img/enemy_laser.png");
-            gs->load_png("enemy_boss_squad", "art/img/enemy_boss_squad.png");
+            load_png("player"          , "art/img/player.png"             );
+            load_png("player_laser"    , "art/img/player_laser.png"       );
+            load_png("player_life"     , "art/img/player_life.png"        );
+            load_png("player_shield"   , "art/img/player_shield.png"      );
 
-            gs->load_png("powerup_shield", "art/img/powerup_shield.png");
-            gs->load_png("powerup_bolt"  , "art/img/powerup_bolt.png");
+            load_png("enemy_1"         , "art/img/enemy_1.png"            );
+            load_png("enemy_2"         , "art/img/enemy_2.png"            );
+            load_png("enemy_3"         , "art/img/enemy_3.png"            );
+            load_png("enemy_boss"      , "art/img/enemy_boss.png"         );
+            load_png("enemy_laser"     , "art/img/enemy_laser.png"        );
+            load_png("enemy_boss_squad", "art/img/enemy_boss_squad.png"   );
 
-            gs->load_sfx("player_laser" , "art/sfx/player_laser.ogg");
-            gs->load_sfx("shield_enabled", "art/sfx/player_laser.ogg");
+            load_png("powerup_shield"  , "art/img/powerup_shield.png"     );
+            load_png("powerup_bolt"    , "art/img/powerup_bolt.png"       );
 
-            std::cout << "Assets loaded ..." << std::endl;
+            load_sfx("player_laser"    , "art/sfx/player_laser.ogg"       );
+            load_sfx("shield_enabled"  , "art/sfx/player_laser.ogg"       );
+
+            end();
         });
 
         auto persistent = std::make_shared<Persistent>("user_info.dat");

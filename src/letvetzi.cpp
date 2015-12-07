@@ -243,7 +243,7 @@ namespace Letvetzi {
             lives += li;
             if (lives == 0) {
                 parent.common.persistent->high_scores.add_score(parent.common.persistent->user_data.player_name, points);
-                parent.high_scores(points);
+                parent.high_scores(points, parent.menu_ms(MainMenu));
             };
         };
         void S_Running::start_boss(int boss_id) {
@@ -491,7 +491,6 @@ namespace Letvetzi {
             run->add_points(e.score/4);
             return true;
         };
-
         Collision collision;
     };
 };

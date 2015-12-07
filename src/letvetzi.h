@@ -374,7 +374,7 @@ namespace Letvetzi {
                 with_menu(MainMenu);
             };
             void with_menu(std::function<Menu()> fn) {
-                *ms = mk_shared<S_Menu>(S_Menu(*this, fn()));
+                *ms = menu_ms(fn);
             };
             void start_game() {
                 *ms = mk_shared<S_Running>(S_Running(*this));
@@ -382,8 +382,8 @@ namespace Letvetzi {
             void high_scores() {
                 *ms = mk_shared<S_HighScores>(S_HighScores(*this, *ms));
             };
-            void high_scores(uint64_t points) {
-                *ms = mk_shared<S_HighScores>(S_HighScores(*this, *ms, points));
+            void high_scores(uint64_t points, MState next_ms) {
+                *ms = mk_shared<S_HighScores>(S_HighScores(*this, next_ms, points));
             };
             void quit_game() {
                 *ms = mk_shared<S_QuitGame>(S_QuitGame());
@@ -391,6 +391,9 @@ namespace Letvetzi {
             void credits() {
                 *ms = mk_shared<S_Credits>(S_Credits(*this, *ms));
             };
+            MState menu_ms(std::function<Menu()> fn) {
+                return mk_shared<S_Menu>(S_Menu(*this, fn()));
+            }
             void maybe(double prob, std::function<void()> fn);
         };
     }
