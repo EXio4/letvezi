@@ -12,9 +12,11 @@ namespace Letvezi {
                 (void)ev;
                 match(*s.ms,
                         [&](std::shared_ptr<GameState::S_Running> run) {
-                            run->shooting = ev.key_down;
-                            {
-                                s.common.sdl_inf->tim.add_timer(0, Ev(s));
+                            if (ev.key_down && !run->shooting) {
+                                run->shooting = s.common.sdl_inf->tim.add_timer(0,Ev(s));
+                            } else if (!ev.key_down && run->shooting) {
+                                s.common.sdl_inf->tim.remove(*run->shooting);
+                                run->shooting = boost::none;
                             };
                         },
                         [&](std::shared_ptr<GameState::S_HighScores>) {

@@ -292,7 +292,7 @@ namespace Letvezi {
             int32_t  bullet_level  = 1;
             int32_t  til_boss      = boss_rate;
             int32_t  bosses_killed = 0;
-            bool shooting = false;
+            boost::optional<TimID> shooting = boost::none;
             std::map<Entity::Name,std::shared_ptr<Entity::Type>> ent_mp;
             Entity::Name last_entity = Entity::Name(1);
             S_Running(Type& parent);
@@ -447,7 +447,9 @@ namespace Letvezi {
                                 Velocity vel = Velocity(0,-120);
                                 vel = (1 + 0.4 * std::min(5,run->bullet_level)) * vel;
                                 run->add_bullet(vel);
-                                s.common.sdl_inf->tim.add_timer(100, *this);
+                                run->shooting = s.common.sdl_inf->tim.add_timer(100, *this);
+                            } else {
+                                run->shooting = boost::none;
                             };
                         },
                         [](std::shared_ptr<GameState::S_HighScores>){},
