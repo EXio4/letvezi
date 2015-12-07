@@ -3,36 +3,37 @@
 #include <map>
 #include <functional>
 
+struct TimID {
+    uint64_t tim_id = 0;
+    TimID& operator++() {
+        tim_id++;
+        return *this;
+    };
+    bool operator==(const TimID& other) const {
+        return tim_id == other.tim_id;
+    };
+    bool operator!=(const TimID& other) const {
+        return tim_id != other.tim_id;
+    };
+    bool operator>=(const TimID& other) const {
+        return tim_id >= other.tim_id;
+    };
+    bool operator<=(const TimID& other) const {
+        return tim_id <= other.tim_id;
+    };
+    bool operator< (const TimID& other) const {
+        return tim_id <  other.tim_id;
+    };
+    bool operator> (const TimID& other) const {
+        return tim_id >  other.tim_id;
+    };
+};
+
 class Timer {
 private:
     struct TimInf {
         int64_t rem_ms = 0;
         std::function<void()> cb;
-    };
-    struct TimID {
-        uint64_t tim_id = 0;
-        TimID& operator++() {
-            tim_id++;
-            return *this;
-        };
-        bool operator==(const TimID& other) const {
-            return tim_id == other.tim_id;
-        };
-        bool operator!=(const TimID& other) const {
-            return tim_id != other.tim_id;
-        };
-        bool operator>=(const TimID& other) const {
-            return tim_id >= other.tim_id;
-        };
-        bool operator<=(const TimID& other) const {
-            return tim_id <= other.tim_id;
-        };
-        bool operator< (const TimID& other) const {
-            return tim_id <  other.tim_id;
-        };
-        bool operator> (const TimID& other) const {
-            return tim_id >  other.tim_id;
-        };
     };
     TimID last_id = TimID{0};
     std::map<TimID, TimInf> s;
