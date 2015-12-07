@@ -23,6 +23,14 @@
 
 PATH="$PATH:/c/Program Files/7-Zip"
 
+optimize_flags='-Ofast -s'
+
+if [[ "$1" == '--debug' ]]; then
+    debug='y'
+    optimize_flags='-O0 -g'
+    shift
+fi
+
 arch="$1"
 date="$(date +'%Y%m%d')"
 commit="$(git rev-parse --short HEAD)"
@@ -35,7 +43,7 @@ fi
 echo 'Starting build'
 
 build_root="build/${arch}"
-build_name="letvezi_win_${arch}_$(date +%Y%m%d)_$(git rev-parse --short HEAD)"
+build_name="letvezi_win_${arch}_$(date +%Y%m%d)_$(git rev-parse --short HEAD)${debug:+_debug}"
 build_dir="${build_root}/${build_name}"
 
 printf 'Build directory: %s\n' "$build_dir"
@@ -47,12 +55,16 @@ fi
 
 mkdir -p "$build_dir"
 
-g++ -std=c++14 src/*.cpp -Wall -Wextra -Ofast -s -Isrc/ -Ilibs/ -I"../${arch}/" -I"../${arch}/boost_1_59_0/" -L"../${arch}/" -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lpthread -o "${build_dir}/letvezi.exe"
+# NB: The lack of quotes around $optimize_flags is intentional.
+g++ -std=c++14 src/*.cpp -Wall -Wextra $optimize_flags -Isrc/ -Ilibs/ -I"../${arch}/" -I"../${arch}/boost_1_59_0/" -L"../${arch}/" -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lpthread -o "${build_dir}/letvezi.exe"
 
 cp -r "../${arch}"/*.dll "$build_dir"
 cp -r ../licenses "$build_dir"
 cp -r art "$build_dir"
 cp LICENSE "${build_dir}/LICENSE.txt"
 
-cd "$build_root"
-7z a "${build_name}.zip" "$build_name"
+if [[ -z "$debug" ]]; then
+    # Don't create a zip in debug mode
+    cd "$build_root"
+    7z a "${build_name}.zip" "$build_name"
+fi
