@@ -1,7 +1,7 @@
 
 #include "render.h"
 
-namespace Letvetzi {
+namespace Letvezi {
     namespace Render {
         bool collide(const SDL_Rect *r1, const SDL_Rect *r2) {
             return (SDL_HasIntersection(r1,r2) == SDL_TRUE);

@@ -1,5 +1,5 @@
-#include "letvetzi.h"
-namespace Letvetzi {
+#include "letvezi.h"
+namespace Letvezi {
     void apply_velocity(Position& pos, Velocity vel, Game::Resolution res, int16_t fps_relation) {
         int16_t p_x = pos.x + (vel.x * res.width  * fps_relation) /100/1000;
         int16_t p_y = pos.y + (vel.y * res.height * fps_relation) /100/1000;
