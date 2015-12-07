@@ -11,7 +11,11 @@
 #include "letvetzi.h"
 #include "render.h"
 
+#ifdef _WIN32
+int WinMain() {
+#else
 int main() {
+#endif
 
     try {
         if(SDL_Init(SDL_INIT_VIDEO) < 0) { throw Game::SDLError(); }
