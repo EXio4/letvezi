@@ -1,6 +1,6 @@
 
 SOURCES = src/main.cpp src/game.cpp src/render.cpp src/letvetzi.cpp src/persistent.cpp src/binary_serial.cpp
-HEADERS = src/game.h src/render.h src/letvetzi.h src/persistent.h src/binary_serial.h
+HEADERS = src/game.h src/render.h src/letvetzi.h src/persistent.h src/binary_serial.h src/timer.h src/conc.h src/vect.h
 OBJECTS = $(SOURCES:.cpp=.o)
 
 EXECUTABLE = build/letvezi

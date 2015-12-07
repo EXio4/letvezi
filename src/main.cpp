@@ -25,13 +25,28 @@ int main() {
         auto gs = std::make_shared<Game::sdl_info>("Letvetzi", "art/font.ttf");
         gs->loading_screen([](auto& ch) {
             auto set_bg   = [&](std::string file) {
-                                ch.push( boost::optional<std::function<void(Game::sdl_info&)>>([file](auto& gs) { gs.set_background(file); }));
+                                ch.push( boost::optional<std::tuple<std::string,std::function<void(Game::sdl_info&)>>>(
+                                    std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
+                                        "background music",
+                                        [file](auto& gs) { gs.set_background(file); }
+                                    )
+                                ));
                             };
             auto load_sfx = [&](std::string key, std::string file) {
-                                ch.push( boost::optional<std::function<void(Game::sdl_info&)>>([key,file](auto& gs) { gs.load_sfx(key,file); }));
+                                ch.push( boost::optional<std::tuple<std::string,std::function<void(Game::sdl_info&)>>>(
+                                    std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
+                                        key,
+                                        [key,file](auto& gs) { gs.load_sfx(key,file); }
+                                    )
+                                ));
                             };
             auto load_png = [&](std::string key, std::string file) {
-                                ch.push( boost::optional<std::function<void(Game::sdl_info&)>>([key,file](auto& gs) { gs.load_png(key,file); }));
+                                ch.push( boost::optional<std::tuple<std::string,std::function<void(Game::sdl_info&)>>>(
+                                    std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
+                                        key,
+                                        [key,file](auto& gs) { gs.load_png(key,file); }
+                                    )
+                                ));
                             };
             auto end = [&]() {
                                 ch.push( boost::none );

@@ -89,7 +89,7 @@ namespace Game {
 
             template <typename FN>
             void loading_screen(FN&& fn) {
-                using LoadCB = boost::optional<std::function<void(sdl_info&)>>;
+                using LoadCB = boost::optional<std::tuple<std::string,std::function<void(sdl_info&)>>>;
                 Resolution res = get_current_res();
                 int start_y   = res.height/4;
                 int finish_y  = 3 * start_y;
@@ -108,13 +108,13 @@ namespace Game {
                     if (current_y > finish_y || current_y < start_y) accel *= -1;
                     current_y += accel;
 
+                    LoadCB x = chan.pop();
+                    if (!x) break;
+                    render_text(3*(res.width/5), 3*(res.height/4), Normal, color, std::get<0>(*x));
                     SDL_RenderPresent(win_renderer);
-
                     {
                         auto t_start = std::chrono::steady_clock::now();
-                        LoadCB x = chan.pop();
-                        if (!x) break;
-                        (*x)(*this);
+                        (std::get<1>(*x))(*this);
                         auto t_finish = std::chrono::steady_clock::now();
                         auto diff = t_finish - t_start;
                         std::this_thread::sleep_for(std::chrono::milliseconds(16) - diff);
