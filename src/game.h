@@ -110,7 +110,7 @@ namespace Game {
 
                     LoadCB x = chan.pop();
                     if (!x) break;
-                    render_text(3*(res.width/5), 3*(res.height/4), Normal, color, std::get<0>(*x));
+                    render_text(res.width/3, 4*(res.height/5), Normal, color, std::get<0>(*x));
                     SDL_RenderPresent(win_renderer);
                     {
                         auto t_start = std::chrono::steady_clock::now();
