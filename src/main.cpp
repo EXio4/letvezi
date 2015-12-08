@@ -27,7 +27,8 @@ int main() {
             printf("Error starting SDL_Mix: %s\n", Mix_GetError());
         }
         auto gs = std::make_shared<Game::sdl_info>("Letvezi", "art/font.ttf");
-        gs->loading_screen([](auto& ch) {
+        auto persistent = std::make_shared<Persistent>("user_info.dat");
+        gs->loading_screen([persistent](auto& ch) {
             auto set_bg   = [&](std::string file) {
                                 ch.push(std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         "background music",
@@ -49,6 +50,14 @@ int main() {
                                     )
                                 );
                             };
+            auto do_ = [&](std::string key, std::function<void()> fn) {
+                                ch.push (std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
+                                        key,
+                                        [fn](auto) {
+                                            fn();
+                                        }
+                                );
+                        };
 
 
             set_bg("art/background.ogg");
@@ -72,12 +81,9 @@ int main() {
 
             load_sfx("player_laser"    , "art/sfx/player_laser.ogg"       );
             load_sfx("shield_enabled"  , "art/sfx/player_laser.ogg"       );
+            do_("user info", [persistent]() { persistent->load(); });
 
         });
-
-        auto persistent = std::make_shared<Persistent>("user_info.dat");
-        std::cout << "Loading user data from user_info.dat " << std::endl;
-        persistent->load();
 
         Game::Resolution res = gs->get_current_res();
         Letvezi::GameState::Type start_state =
