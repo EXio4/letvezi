@@ -89,13 +89,13 @@ namespace Game {
 
             template <typename FN>
             void loading_screen(FN&& fn) {
-                using LoadCB = boost::optional<std::tuple<std::string,std::function<void(sdl_info&)>>>;
+                using LoadCB = std::tuple<std::string,std::function<void(sdl_info&)>>;
                 Resolution res = get_current_res();
                 int start_y   = res.height/4;
                 int finish_y  = 3 * start_y;
                 int current_y = start_y;
                 int accel = 32;
-                Conc::Chan<LoadCB> chan;
+                std::queue<LoadCB> chan;
                 fn(chan);
                 while (1) {
                     SDL_SetRenderDrawColor(win_renderer, 0, 0, 0, 255);
@@ -108,13 +108,14 @@ namespace Game {
                     if (current_y > finish_y || current_y < start_y) accel *= -1;
                     current_y += accel;
 
-                    LoadCB x = chan.pop();
-                    if (!x) break;
-                    render_text(res.width/3, 4*(res.height/5), Normal, color, std::get<0>(*x));
+                    if (chan.size() == 0) break;
+                    LoadCB x = chan.front();
+                    chan.pop();
+                    render_text(res.width/3, 4*(res.height/5), Normal, color, std::get<0>(x));
                     SDL_RenderPresent(win_renderer);
                     {
                         auto t_start = std::chrono::steady_clock::now();
-                        (std::get<1>(*x))(*this);
+                        (std::get<1>(x))(*this);
                         auto t_finish = std::chrono::steady_clock::now();
                         auto diff = t_finish - t_start;
                         std::this_thread::sleep_for(std::chrono::milliseconds(16) - diff);
@@ -195,7 +196,7 @@ namespace Game {
                     debt = debt / 2;
 
                     if (sleep_time >= std::chrono::milliseconds(0)) {
-                        std::this_thread::sleep_for(sleep_time-std::chrono::milliseconds(2));
+                          std::this_thread::sleep_for(sleep_time + std::chrono::milliseconds(1));
                     } else {
                         /* if we are here, that means we have got a negative sleep time
                          * iow, we need to "advance" more in the next frame to make up for the slow frame we had previously

@@ -29,31 +29,25 @@ int main() {
         auto gs = std::make_shared<Game::sdl_info>("Letvezi", "art/font.ttf");
         gs->loading_screen([](auto& ch) {
             auto set_bg   = [&](std::string file) {
-                                ch.push( boost::optional<std::tuple<std::string,std::function<void(Game::sdl_info&)>>>(
-                                    std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
+                                ch.push(std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         "background music",
                                         [file](auto& gs) { gs.set_background(file); }
                                     )
-                                ));
+                                );
                             };
             auto load_sfx = [&](std::string key, std::string file) {
-                                ch.push( boost::optional<std::tuple<std::string,std::function<void(Game::sdl_info&)>>>(
-                                    std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
+                                ch.push( std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         key,
                                         [key,file](auto& gs) { gs.load_sfx(key,file); }
                                     )
-                                ));
+                                );
                             };
             auto load_png = [&](std::string key, std::string file) {
-                                ch.push( boost::optional<std::tuple<std::string,std::function<void(Game::sdl_info&)>>>(
-                                    std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
+                                ch.push( std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         key,
                                         [key,file](auto& gs) { gs.load_png(key,file); }
                                     )
-                                ));
-                            };
-            auto end = [&]() {
-                                ch.push( boost::none );
+                                );
                             };
 
 
@@ -79,7 +73,6 @@ int main() {
             load_sfx("player_laser"    , "art/sfx/player_laser.ogg"       );
             load_sfx("shield_enabled"  , "art/sfx/player_laser.ogg"       );
 
-            end();
         });
 
         auto persistent = std::make_shared<Persistent>("user_info.dat");
@@ -99,6 +92,7 @@ int main() {
                 [gs](Conc::VarL<Letvezi::GameState::Type>& typ,uint16_t fps_rel) {
                             return Letvezi::Render::handler_game(gs,typ,fps_rel);
                         };
+
 
         gs->loop(event_fn, game_fn, render_fn, start_state);
         persistent->save();

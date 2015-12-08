@@ -6,9 +6,9 @@ OBJECTS = $(SOURCES:.cpp=.o)
 
 EXECUTABLE = build/letvezi
 
-LDFLAGS = -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lpthread
+LDFLAGS = `sdl2-config --libs` -lSDL2_image -lSDL2_ttf -lSDL2_mixer -lpthread
 
-INCLUDES = -I src/ -I libs/
+INCLUDES = -I src/ -I libs/ `sdl2-config --cflags`
 
 ifdef $(RELEASE)
 OPTS = -Ofast -s
