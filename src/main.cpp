@@ -28,7 +28,7 @@ int main() {
         }
         auto gs = std::make_shared<Game::sdl_info>("Letvezi", "art/font.ttf");
         auto persistent = std::make_shared<Persistent>("user_info.dat");
-        gs->loading_screen([persistent](auto& ch) {
+        gs->loading_screen([&](auto& ch) {
             auto set_bg   = [&ch](std::string file) {
                                 ch.push(std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         "background music",
@@ -50,7 +50,7 @@ int main() {
                                     )
                                 );
                             };
-            auto do_ = [&ch](std::string key, auto fn) {
+            auto do_ = [&ch](std::string key, std::function<void()> fn) {
                                 ch.push( std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         key,
                                         [key,fn](auto&) {
@@ -82,7 +82,7 @@ int main() {
 
             load_sfx("player_laser"    , "art/sfx/player_laser.ogg"       );
             load_sfx("shield_enabled"  , "art/sfx/player_laser.ogg"       );
-            do_("user info", [persistent]() { persistent->load(); });
+            do_("user info", [&]() { persistent->load(); });
 
         });
 
