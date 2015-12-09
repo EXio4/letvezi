@@ -58,8 +58,8 @@ void Persistent::HighScores::add_score(std::string player_name, uint64_t points)
     };
 };
 
-void Persistent::serialize_to(std::string file_name) {
-    std::fstream fh(file_name , std::ios::out | std::ios::binary);
+void Persistent::serialize_to(std::string& file_name) {
+    std::fstream fh(file_name.c_str() , std::ios::out | std::ios::binary);
     Binary::Data w = Binary::serialize<uint32_t>(persistent_magic_number) +
                      Binary::serialize<uint8_t> (2); // high_scores + user_data
 
@@ -68,8 +68,8 @@ void Persistent::serialize_to(std::string file_name) {
     w.writeTo(fh);
 };
 
-bool Persistent::load_from(std::string file_name) {
-    std::fstream fh(file_name , std::ios::in | std::ios::binary);
+bool Persistent::load_from(std::string& file_name) {
+    std::fstream fh(file_name.c_str() , std::ios::in | std::ios::binary);
     if (!fh || (fh && !fh.is_open())) return false;
     Binary::Data w;
     w.loadFrom(fh);

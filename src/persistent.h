@@ -55,8 +55,8 @@ struct Persistent {
         UserData   user_data;
         Persistent(std::string file) : file_name(file) {
         };
-        void serialize_to(std::string);
-        bool load_from(std::string);
+        void serialize_to(std::string&);
+        bool load_from(std::string&);
         void save() { return serialize_to(file_name); };
         bool load() { return load_from(file_name);    };
 };
