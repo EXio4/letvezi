@@ -13,7 +13,7 @@ INCLUDES = -I src/ -I libs/ `sdl2-config --cflags`
 ifdef $(RELEASE)
 OPTS = -Ofast -s
 else
-OPTS = -O0 -g
+OPTS = -O0 -g -fno-omit-frame-pointer
 endif
 
 ifdef $(WINDOWS)
