@@ -111,6 +111,7 @@ namespace Game {
 
             sdl_info(const char* game_name, std::string font_name,int fps_param=60);
             sdl_info(const sdl_info&) = delete;
+            sdl_info& operator=(const sdl_info&) = delete;
             ~sdl_info();
 
             Resolution get_current_res();

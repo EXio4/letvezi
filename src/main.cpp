@@ -28,33 +28,32 @@ int main() {
         }
         auto gs = std::make_shared<Game::sdl_info>("Letvezi", "art/font.ttf");
         auto persistent = std::make_shared<Persistent>("user_info.dat");
-        gs->loading_screen([&](auto& ch) {
-            auto set_bg   = [&](std::string file) {
+        gs->loading_screen([persistent](auto& ch) {
+            auto set_bg   = [&ch](std::string file) {
                                 ch.push(std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         "background music",
                                         [file](auto& gs) { gs.set_background(file); }
                                     )
                                 );
                             };
-            auto load_sfx = [&](std::string key, std::string file) {
+            auto load_sfx = [&ch](std::string key, std::string file) {
                                 ch.push( std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         key,
                                         [key,file](auto& gs) { gs.load_sfx(key,file); }
                                     )
                                 );
                             };
-            auto load_png = [&](std::string key, std::string file) {
+            auto load_png = [&ch](std::string key, std::string file) {
                                 ch.push( std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         key,
                                         [key,file](auto& gs) { gs.load_png(key,file); }
                                     )
                                 );
                             };
-            auto do_ = [&](std::string key, auto fn) {
+            auto do_ = [&ch](std::string key, auto fn) {
                                 ch.push( std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         key,
-                                        [&](auto&) {
-                                            (void)fn;
+                                        [key,fn](auto&) {
                                             std::cout << "wat : " << key << std::endl;
                                             fn();
                                         }
