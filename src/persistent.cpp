@@ -70,7 +70,7 @@ void Persistent::serialize_to(std::string file_name) {
 
 bool Persistent::load_from(std::string file_name) {
     std::fstream fh(file_name , std::ios::in | std::ios::binary);
-    if (!fh.is_open()) return false;
+    if (!fh || (fh && !fh.is_open())) return false;
     Binary::Data w;
     w.loadFrom(fh);
     {
