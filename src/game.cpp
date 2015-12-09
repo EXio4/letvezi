@@ -9,6 +9,9 @@ namespace Game {
             fonts[Small]  = TTF_OpenFont(font_name.c_str(), 20);
             fonts[Normal] = TTF_OpenFont(font_name.c_str(), 24);
             fonts[Huge]   = TTF_OpenFont(font_name.c_str(), 32);
+            if (fonts[Small] == NULL || fonts[Normal] == NULL || fonts[Huge] == NULL) {
+                throw SDLError("Error loading fonts");
+            };
             gm_name = game_name;
     }
     sdl_info::~sdl_info() {
