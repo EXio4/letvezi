@@ -18,6 +18,13 @@ namespace Game {
         for (const auto& pair : txts) {
             SDL_DestroyTexture(pair.second.texture);
         };
+        for (const auto& pair : sfx) {
+            Mix_FreeChunk(pair.second);
+        };
+        Mix_FreeMusic(music);
+        for (const auto& pair : fonts) {
+            TTF_CloseFont(pair.second);
+        };
         SDL_DestroyWindow(window);
         std::cout << "Cleaning up resources ..." << std::endl;
     }
