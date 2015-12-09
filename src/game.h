@@ -60,6 +60,40 @@ namespace Game {
         TextureInfo() : texture(NULL), width(0), height(0) {}
     };
 
+    namespace Utils {
+        template <typename FN>
+        auto tempo(uint32_t expected_time_loop, FN&& fn) {
+                    auto debt = std::chrono::milliseconds(0);
+                    while(true) {
+
+                        auto t_start = std::chrono::steady_clock::now();
+
+                        Game::LSit x = fn(expected_time_loop, debt);
+                        switch(x) {
+                            case BreakLoop: return;
+                                            break;
+                            default:   break;
+                        }
+
+                        auto t_finish = std::chrono::steady_clock::now();
+                        auto dif = std::chrono::duration_cast<std::chrono::milliseconds>(t_finish - t_start);
+                        auto sleep_time = std::chrono::milliseconds(expected_time_loop) - dif;
+
+                        debt = debt / 2;
+
+                        if (sleep_time >= std::chrono::milliseconds(0)) {
+                            std::this_thread::sleep_for(sleep_time + std::chrono::milliseconds(1));
+                        } else {
+                            /* if we are here, that means we have got a negative sleep time
+                            * iow, we need to "advance" more in the next frame to make up for the slow frame we had previously
+                            */
+                            debt = -sleep_time;
+                        }
+                    };
+
+        };
+    };
+
     class sdl_info {
     private:
             uint16_t fps = 60; /* fps >= 0 */
@@ -76,6 +110,7 @@ namespace Game {
             Timer tim;
 
             sdl_info(const char* game_name, std::string font_name,int fps_param=60);
+            sdl_info(const sdl_info&) = delete;
             ~sdl_info();
 
             Resolution get_current_res();
@@ -150,6 +185,7 @@ namespace Game {
             template <typename EV, typename S>
             void loop(std::function<void(Conc::Chan<SDL_Event>&,Conc::Chan<EV>&)> event_handler  ,
                       std::function<void(Conc::Chan<EV>&,Conc::VarL<S>&)>         gs_handler     ,
+                      std::function<void(Conc::VarL<S>&)>                         expensive_fn   ,
                       std::function<LSit(Conc::VarL<S>&,uint16_t)>                render_handler ,
                       S start_state) {
 
@@ -168,43 +204,22 @@ namespace Game {
 
                 std::thread ev_th(event_handler, std::ref(sdl_events),  std::ref(game_events));
                 std::thread gevs_th(gs_handler , std::ref(game_events), std::ref(game_state));
+                std::thread exp_th(expensive_fn, std::ref(game_state)); 
 
                 ev_th.detach();
                 gevs_th.detach();
+                exp_th.detach();
                 uint16_t fps_relation = 1000/fps;
 
-                auto debt = std::chrono::milliseconds(0);
-                while(true) {
+                Utils::tempo(fps_relation, [&](uint32_t&, auto debt) {
                     SDL_Event e;
                     while( SDL_PollEvent(&e) != 0) {
                         sdl_events.push(e);
                     }
-                    auto t_start = std::chrono::steady_clock::now();
                     LSit x = render_handler(game_state, fps_relation + debt.count() + 2);
-                    switch(x) {
-                        case BreakLoop: return;
-                                        break;
-                        default:   break;
-                    }
-
-                    auto t_finish = std::chrono::steady_clock::now();
-                    auto dif = std::chrono::duration_cast<std::chrono::milliseconds>(t_finish - t_start);
-                    auto sleep_time = std::chrono::milliseconds(fps_relation) - dif;
-
                     SDL_RenderPresent(win_renderer);
-
-                    debt = debt / 2;
-
-                    if (sleep_time >= std::chrono::milliseconds(0)) {
-                          std::this_thread::sleep_for(sleep_time + std::chrono::milliseconds(1));
-                    } else {
-                        /* if we are here, that means we have got a negative sleep time
-                         * iow, we need to "advance" more in the next frame to make up for the slow frame we had previously
-                         */
-                        debt = -sleep_time;
-                    }
-                };
-
+                    return x;
+                });
             };
     };
 }

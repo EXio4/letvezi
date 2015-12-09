@@ -7,31 +7,26 @@ namespace Letvezi {
             return (SDL_HasIntersection(r1,r2) == SDL_TRUE);
         };
 
-        Game::LSit Eng::render_QuitGame(std::shared_ptr<GameState::S_QuitGame>) {
-            return Game::BreakLoop;
-        };
-        Game::LSit Eng::render_Running(std::shared_ptr<GameState::S_Running> run) {
+        void Eng::apply_HighScores(std::shared_ptr<GameState::S_HighScores>) {};
+        void Eng::apply_QuitGame  (std::shared_ptr<GameState::S_QuitGame  >) {};
+        void Eng::apply_Menu      (std::shared_ptr<GameState::S_Menu      >) {};
+        void Eng::apply_Credits   (std::shared_ptr<GameState::S_Credits   >) {};
 
+        void Eng::apply_Running   (std::shared_ptr<GameState::S_Running   > run) {
             std::shared_ptr<Entity::Type> player_pointer = run->ent_mp[Entity::PlayerID()];
 
-            /* draw entities on the world */
             for (auto curr = run->ent_mp.begin() ; curr != run->ent_mp.end() ;) {
+                apply_velocity(curr->second->pos, curr->second->vel, s.common.res, fps_relation);
+                if ((curr->second->pos.x > s.common.res.width  || curr->second->pos.x < 0) ||
+                    (curr->second->pos.y > s.common.res.height || curr->second->pos.y < 0) ) {
+                        curr->second->out_of_screen(run);
+                };
                 if (curr->second->killed) {
                     curr = run->ent_mp.erase(curr);
                 } else {
                     curr++;
                 };
             };
-
-            for (auto& curr : run->ent_mp) {
-                apply_velocity(curr.second->pos, curr.second->vel, s.common.res, fps_relation);
-                render_pic(curr.second->pos, curr.second->txt_name);
-                curr.second->extra_render(run, sdl_inf, fps_relation);
-                if ((curr.second->pos.x > s.common.res.width  || curr.second->pos.x < 0) ||
-                    (curr.second->pos.y > s.common.res.height || curr.second->pos.y < 0) ) {
-                        curr.second->out_of_screen(run);
-                };
-            }
 
             // collision detection
             for (auto& curr : run->ent_mp) {
@@ -52,7 +47,20 @@ namespace Letvezi {
                     };
                 });
             };
+        };
 
+
+        Game::LSit Eng::render_QuitGame(std::shared_ptr<GameState::S_QuitGame>) {
+            return Game::BreakLoop;
+        };
+        Game::LSit Eng::render_Running(std::shared_ptr<GameState::S_Running> run) {
+
+            std::shared_ptr<Entity::Type> player_pointer = run->ent_mp[Entity::PlayerID()];
+
+           for (auto& curr : run->ent_mp) {
+                render_pic(curr.second->pos, curr.second->txt_name);
+                curr.second->extra_render(run, sdl_inf, fps_relation);
+            }
             {
                 int32_t shield = dynamic_cast<Entity::Player*>(run->ent_mp[Entity::PlayerID()].get())->shield;
                 Hud hud;

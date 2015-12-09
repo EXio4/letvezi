@@ -16,6 +16,7 @@ namespace Game {
             SDL_DestroyTexture(pair.second.texture);
         };
         SDL_DestroyWindow(window);
+        std::cout << "Cleaning up resources ..." << std::endl;
     }
 
     Resolution sdl_info::get_current_res() {

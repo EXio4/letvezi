@@ -28,7 +28,7 @@ int main() {
         }
         auto gs = std::make_shared<Game::sdl_info>("Letvezi", "art/font.ttf");
         auto persistent = std::make_shared<Persistent>("user_info.dat");
-        gs->loading_screen([persistent](auto& ch) {
+        gs->loading_screen([&](auto& ch) {
             auto set_bg   = [&](std::string file) {
                                 ch.push(std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         "background music",
@@ -50,13 +50,15 @@ int main() {
                                     )
                                 );
                             };
-            auto do_ = [&](std::string key, std::function<void()> fn) {
-                                ch.push (std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
+            auto do_ = [&](std::string key, auto fn) {
+                                ch.push( std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         key,
-                                        [fn](auto) {
+                                        [&](auto&) {
+                                            (void)fn;
+                                            std::cout << "wat : " << key << std::endl;
                                             fn();
                                         }
-                                );
+                                ));
                         };
 
 
@@ -98,9 +100,11 @@ int main() {
                 [gs](Conc::VarL<Letvezi::GameState::Type>& typ,uint16_t fps_rel) {
                             return Letvezi::Render::handler_game(gs,typ,fps_rel);
                         };
+        std::function<void(Conc::VarL<Letvezi::GameState::Type>&)> expensive_handler =
+                Letvezi::Render::expensive_handler;
 
 
-        gs->loop(event_fn, game_fn, render_fn, start_state);
+        gs->loop(event_fn, game_fn, expensive_handler, render_fn, start_state);
         persistent->save();
         printf("Game over!\n");
 

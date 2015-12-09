@@ -56,6 +56,12 @@ namespace Letvezi {
             Game::LSit render_Menu      (std::shared_ptr<GameState::S_Menu      >);
             Game::LSit render_Credits   (std::shared_ptr<GameState::S_Credits   >);
 
+            void apply_HighScores(std::shared_ptr<GameState::S_HighScores>);
+            void apply_Running   (std::shared_ptr<GameState::S_Running   >);
+            void apply_QuitGame  (std::shared_ptr<GameState::S_QuitGame  >);
+            void apply_Menu      (std::shared_ptr<GameState::S_Menu      >);
+            void apply_Credits   (std::shared_ptr<GameState::S_Credits   >);
+
             void render_pic(Position, std::string,uint8_t alpha=255);
             void render_background();
             void render_hud(const Hud&);
@@ -67,7 +73,7 @@ namespace Letvezi {
             return svar.modify([&](GameState::Type& s) {
                 Eng eng(gs, s, fps_relation);
                 eng.render_background();
-                gs->tim.advance(fps_relation);
+
                 return match(*(s.ms)
                             , [&](std::shared_ptr<GameState::S_HighScores> x) { return eng.render_HighScores(x); }
                             , [&](std::shared_ptr<GameState::S_Running   > x) { return eng.render_Running   (x); }
@@ -75,6 +81,22 @@ namespace Letvezi {
                             , [&](std::shared_ptr<GameState::S_Menu      > x) { return eng.render_Menu      (x); }
                             , [&](std::shared_ptr<GameState::S_Credits   > x) { return eng.render_Credits   (x); });
             });
+        };
+
+        void inline expensive_handler(Conc::VarL<GameState::Type>& svar) {
+                Game::Utils::tempo(10, [&](uint32_t&, auto debt) {
+                    return svar.modify([&](GameState::Type& s) {
+                        uint16_t fps_relation = 10 + debt.count();
+                        Eng eng(s.common.sdl_inf, s, fps_relation);
+                        s.common.sdl_inf->tim.advance(fps_relation);
+                        return match(*(s.ms)
+                                    , [&](std::shared_ptr<GameState::S_HighScores> x) { eng.apply_HighScores(x); return Game::KeepLooping; }
+                                    , [&](std::shared_ptr<GameState::S_Running   > x) { eng.apply_Running   (x); return Game::KeepLooping; }
+                                    , [&](std::shared_ptr<GameState::S_QuitGame  > x) { eng.apply_QuitGame  (x); return Game::BreakLoop  ; }
+                                    , [&](std::shared_ptr<GameState::S_Menu      > x) { eng.apply_Menu      (x); return Game::KeepLooping; }
+                                    , [&](std::shared_ptr<GameState::S_Credits   > x) { eng.apply_Credits   (x); return Game::KeepLooping; });
+                    });
+                });
         };
     };
 };
