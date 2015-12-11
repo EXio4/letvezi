@@ -53,12 +53,16 @@ namespace Letvezi {
             std::shared_ptr<Game::sdl_info> sdl_inf;
             GameState::Type&   s;
             uint16_t           fps_relation;
+            uint64_t counter;
 
         public:
             Eng(std::shared_ptr<Game::sdl_info>  sdl_inf     ,
                 GameState::Type&                 s           ,
-                uint16_t                         fps_relation)
-                : sdl_inf(sdl_inf), s(s), fps_relation(fps_relation) {};
+                uint16_t                         fps_relation,
+                uint64_t counter = 0
+               ) : sdl_inf(sdl_inf), s(s), fps_relation(fps_relation) , counter(counter) {};
+
+            int64_t inline get_counter() { return counter; }
 
             Game::LSit render_HighScores(std::shared_ptr<GameState::S_HighScores>);
             Game::LSit render_Running   (std::shared_ptr<GameState::S_Running   >);
@@ -94,17 +98,20 @@ namespace Letvezi {
         };
 
         void inline expensive_handler(Conc::VarL<GameState::Type>& svar) {
+                uint64_t counter = 0;
                 Game::Utils::tempo(10, [&](uint32_t&, auto debt) {
                     return svar.modify([&](GameState::Type& s) {
                         uint16_t fps_relation = 10 + debt.count();
-                        Eng eng(s.common.sdl_inf, s, fps_relation);
+                        Eng eng(s.common.sdl_inf, s, fps_relation, counter);
                         s.common.sdl_inf->tim.advance(fps_relation);
-                        return match(*(s.ms)
+                        auto x = match(*(s.ms)
                                     , [&](std::shared_ptr<GameState::S_HighScores> x) { eng.apply_HighScores(x); return Game::KeepLooping; }
                                     , [&](std::shared_ptr<GameState::S_Running   > x) { eng.apply_Running   (x); return Game::KeepLooping; }
                                     , [&](std::shared_ptr<GameState::S_QuitGame  > x) { eng.apply_QuitGame  (x); return Game::BreakLoop  ; }
                                     , [&](std::shared_ptr<GameState::S_Menu      > x) { eng.apply_Menu      (x); return Game::KeepLooping; }
                                     , [&](std::shared_ptr<GameState::S_Credits   > x) { eng.apply_Credits   (x); return Game::KeepLooping; });
+                        counter = eng.get_counter();
+                        return x;
                     });
                 });
         };

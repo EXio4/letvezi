@@ -275,7 +275,8 @@ namespace Letvezi {
             int16_t current = 0;
             int16_t pressed = 0;
             void move(int16_t x) {
-                current = (current + x) % opts.size();
+                int16_t n = opts.size();
+                current = (((current + x) % n) + n) % n;
             };
         };
 
@@ -288,7 +289,7 @@ namespace Letvezi {
             std::shared_ptr<S_Running> this_;
             struct PlayerInf {
                 uint64_t points = 0;
-                int32_t  lives  = 100;
+                int32_t  health = 100;
                 int32_t  shield = 25;
                 int32_t  bullet_level = 1;
                 int32_t  damage_screen = 0;

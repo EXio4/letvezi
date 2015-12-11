@@ -15,6 +15,17 @@ namespace Letvezi {
         void Eng::apply_Running   (std::shared_ptr<GameState::S_Running   > run) {
             std::shared_ptr<Entity::Type> player_pointer = run->ent_mp[Entity::PlayerID()];
 
+            counter += fps_relation;
+            if (counter >= 500) {
+                counter = 0;
+                if (run->player.health > 100) {
+                    run->player.health -= 1;
+                }
+                if (run->player.health < 100 && run->player.shield > 15) {
+                    run->player.health++;
+                }
+            };
+
             run->player.damage_screen -= fps_relation;
 
             for (auto curr = run->ent_mp.begin() ; curr != run->ent_mp.end() ;) {
@@ -64,8 +75,7 @@ namespace Letvezi {
                 curr.second->extra_render(run, sdl_inf, fps_relation);
             }
             if (run->player.shield > 0) {
-                int alpha = 255;
-                if (run->player.shield < 5) alpha = 255 - 45 * run->player.shield;
+                int alpha = std::min(255, 4 * run->player.shield);
                 render_pic(run->ent_mp[Entity::PlayerID()]->pos - Position(10,16), "player_shield", alpha);
             };
             {
@@ -81,7 +91,7 @@ namespace Letvezi {
                 SDL_Color txt_color = {200, 200, 200, 255}; // hud color
                 hud.start_hud = s.common.res.height - 64;
                 hud.add_text(s.common.res.width - 256 - 32 , s.common.res.height - 48, txt_color, "Points:  " + std::to_string(run->player.points));
-                hud.add_text(48, s.common.res.height - 48, txt_color, std::to_string(run->player.lives));
+                hud.add_text(48, s.common.res.height - 48, txt_color, std::to_string(run->player.health));
                 {
                     /*                   std::vector<SDL_Color> colors {
                                     {255,   0,   0, 255}, // 0  - 25
@@ -100,7 +110,7 @@ namespace Letvezi {
                         return SDL_Color {static_cast<uint8_t>(r), static_cast<uint8_t>(g), static_cast<uint8_t>(b), 255};
                     };
                     Position pos(48 + 60, s.common.res.height - 48);
-                    for (int32_t i=0; i < run->player.lives; i++) {
+                    for (int32_t i=0; i < run->player.health; i++) {
                         hud.add_rect(HudRect{pos, {4,32}, colors(i), false});
                         pos.x += 4;
                     };

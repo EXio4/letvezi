@@ -45,6 +45,7 @@ namespace Letvezi {
                                 165
                             };
                             auto speed = Velocity(look[std::min(6, run->player.bullet_level)-1], 0);
+                            speed.x = std::min<double>(speed.x, std::max<double>(0.5 * (double)speed.x, (double)speed.x * ((double)run->player.health/75)));
                             auto zero  = Velocity(0,0);
                             switch(ev.dir) {
                                 case Left:
@@ -122,7 +123,7 @@ namespace Letvezi {
                                     *s.ms = run;
                                 }});
                                 menu.opts.push_back(GameState::MenuOption{"KILL MYSELF", [run](GameState::Type&) {
-                                    run->add_life(-run->player.lives);
+                                    run->add_life(-run->player.health);
                                 }});
                                 menu.opts.push_back(GameState::MenuOption{"Credits",[](GameState::Type& s) {
                                     s.credits();
@@ -242,12 +243,12 @@ namespace Letvezi {
             };
         };
         void S_Running::add_life(unsigned int li) {
-            player.lives += li;
-            if (player.lives <= 0) {
+            player.health += li;
+            if (player.health <= 0) {
                 parent.common.persistent->high_scores.add_score(parent.common.persistent->user_data.player_name, player.points);
                 parent.high_scores(player.points, parent.menu_ms(MainMenu));
             };
-            player.lives = std::min(player.lives, 125);
+            player.health = std::min(player.health, 125);
         };
         void S_Running::do_damage(unsigned int dm) {
             if (player.shield >= 0) {
