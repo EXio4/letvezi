@@ -31,7 +31,8 @@ int main() {
 
         if (persistent == NULL) throw std::runtime_error("Failed to create user settings object");
 
-        gs->loading_screen([persistent](auto& ch) {
+        auto per = [persistent]() { persistent->load(); };
+        gs->loading_screen([per](auto& ch) {
             auto set_bg   = [&ch](std::string file) {
                                 ch.push(std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         "background music",
@@ -84,7 +85,7 @@ int main() {
 
             load_sfx("player_laser"    , "art/sfx/player_laser.ogg"       );
             load_sfx("shield_enabled"  , "art/sfx/player_laser.ogg"       );
-            do_("user info", [persistent]() { persistent->load(); });
+            do_("user info", per);
 
         });
 
