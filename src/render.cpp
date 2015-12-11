@@ -15,6 +15,8 @@ namespace Letvezi {
         void Eng::apply_Running   (std::shared_ptr<GameState::S_Running   > run) {
             std::shared_ptr<Entity::Type> player_pointer = run->ent_mp[Entity::PlayerID()];
 
+            run->player.damage_screen -= fps_relation;
+
             for (auto curr = run->ent_mp.begin() ; curr != run->ent_mp.end() ;) {
                 apply_velocity(curr->second->pos, curr->second->vel, s.common.res, fps_relation);
                 if ((curr->second->pos.x > s.common.res.width  || curr->second->pos.x < 0) ||
@@ -61,20 +63,61 @@ namespace Letvezi {
                 render_pic(curr.second->pos, curr.second->txt_name);
                 curr.second->extra_render(run, sdl_inf, fps_relation);
             }
+            if (run->player.shield > 0) {
+                int alpha = 255;
+                if (run->player.shield < 5) alpha = 255 - 45 * run->player.shield;
+                render_pic(run->ent_mp[Entity::PlayerID()]->pos - Position(10,16), "player_shield", alpha);
+            };
             {
-                int32_t shield = dynamic_cast<Entity::Player*>(run->ent_mp[Entity::PlayerID()].get())->shield;
+                if (run->player.damage_screen > 0) {
+                    SDL_SetRenderDrawColor(sdl_inf->win_renderer, 255, 0, 0, 48 + 2 * run->player.damage_screen);
+                    SDL_SetRenderDrawBlendMode(sdl_inf->win_renderer, SDL_BLENDMODE_BLEND);
+                    SDL_Rect rect {0, 0, run->parent.common.res.width, run->parent.common.res.height};
+                    SDL_RenderFillRect(sdl_inf->win_renderer, &rect);
+                }
+            }
+            {
                 Hud hud;
                 SDL_Color txt_color = {200, 200, 200, 255}; // hud color
                 hud.start_hud = s.common.res.height - 64;
-                hud.add_text(s.common.res.width - 256 - 32 , s.common.res.height - 48, txt_color, "Points:  " + std::to_string(run->points));
-                hud.add_text(s.common.res.width - 512 - 32 , s.common.res.height - 48, txt_color, "Shield: " + std::to_string(shield));
-                hud.add_text(48, s.common.res.height - 48, txt_color, "Lives: ");
-                Position pos(48 + 20 * 7, s.common.res.height - 48);
-                for (int32_t i=0; i < run->lives; i++) {
-                    hud.add_image("player_life", pos);
-                    pos.x += 40;
+                hud.add_text(s.common.res.width - 256 - 32 , s.common.res.height - 48, txt_color, "Points:  " + std::to_string(run->player.points));
+                hud.add_text(48, s.common.res.height - 48, txt_color, std::to_string(run->player.lives));
+                {
+                    /*                   std::vector<SDL_Color> colors {
+                                    {255,   0,   0, 255}, // 0  - 25
+                                    {255, 255,   0, 255}, // 25 - 50
+                                    {  0, 255,   0, 255}, // 50 - 75
+                                    {  0,   0, 255, 255}, // 75 -100
+                                    {255,   0, 255, 255}, // 100-125
+                            };*/
+                    auto colors = [](int32_t x) {
+                        auto limit = [](auto x) {
+                            return std::max<decltype(x)>(0, std::min<decltype(x)>(255, x));
+                        };
+                        double r = limit((111*x*x)/1000-(231*x)/20+300);
+                        double g = limit(-(3*x*x*x)/250+(81*x*x)/100-(27*x)/5);
+                        double b = limit((x*x)/4-10*x-40);
+                        return SDL_Color {static_cast<uint8_t>(r), static_cast<uint8_t>(g), static_cast<uint8_t>(b), 255};
+                    };
+                    Position pos(48 + 60, s.common.res.height - 48);
+                    for (int32_t i=0; i < run->player.lives; i++) {
+                        hud.add_rect(HudRect{pos, {4,32}, colors(i), false});
+                        pos.x += 4;
+                    };
+                }
+                hud.add_text(s.common.res.width - 512 - 32 * 6 , s.common.res.height - 48, txt_color, std::to_string(run->player.shield));
+                {
+                    Position pos(s.common.res.width - 512 - 32 * 4, s.common.res.height - 48);
+                    auto scolors = [](int32_t x) {
+                        double w_ = 210 - 4 * (x/3);
+                        uint8_t w = static_cast<uint8_t>(w_);
+                        return SDL_Color {w, w, w, 255};
+                    };
+                    for (int32_t i=0; i < run->player.shield; i++) {
+                        hud.add_rect(HudRect{pos, {2,32}, scolors(i), false});
+                        pos.x += 2;
+                    }
                 };
-
                 render_hud(hud);
             };
 
@@ -215,6 +258,15 @@ namespace Letvezi {
                 for (auto& spr : hud.items) {
                     render_pic(Position(spr.pos.x, spr.pos.y), spr.texture);
                 };
+                for (auto& rec : hud.rects) {
+                    SDL_SetRenderDrawColor(sdl_inf->win_renderer, rec.col.r, rec.col.g, rec.col.b, rec.col.a);
+                    SDL_Rect rect {rec.p1.x, rec.p1.y, rec.p2.x, rec.p2.y};
+                    if (rec.fill) {
+                        SDL_RenderFillRect(sdl_inf->win_renderer, &rect);
+                    } else {
+                        SDL_RenderDrawRect(sdl_inf->win_renderer, &rect);
+                    };
+                };
         };
 
         void Eng::render_background() {
@@ -241,15 +293,7 @@ namespace Letvezi {
         }
     };
     namespace Entity {
-        void Player::extra_render(std::shared_ptr<GameState::S_Running> gs, std::shared_ptr<Game::sdl_info> sdl_inf, int fps_rel) {
-            if (shield > 0) {
-                Render::Eng eng(sdl_inf, gs->parent, fps_rel);
-                int alpha = 255;
-                if (shield < 1000) alpha = shield/4;
-                eng.render_pic(pos - Position(10,16), "player_shield", alpha);
-                shield -= fps_rel;
-                shield = std::max(0, shield);
-            };
+        void Player::extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int)   {
         };
         void PlayerBullet::extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int) {
         };

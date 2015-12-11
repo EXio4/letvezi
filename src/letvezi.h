@@ -118,7 +118,6 @@ namespace Letvezi {
 
         class Player : public Type {
             public:
-                int32_t shield = 2500;
                 Player(Position pos_, Velocity vel_) {
                     pos = pos_;
                     vel = vel_;
@@ -287,9 +286,13 @@ namespace Letvezi {
         struct S_Running {
             Type& parent;
             std::shared_ptr<S_Running> this_;
-            uint64_t points = 0;
-            int32_t  lives  = 10;
-            int32_t  bullet_level  = 1;
+            struct PlayerInf {
+                uint64_t points = 0;
+                int32_t  lives  = 100;
+                int32_t  shield = 25;
+                int32_t  bullet_level = 1;
+                int32_t  damage_screen = 0;
+            } player;
             int32_t  til_boss      = boss_rate;
             int32_t  bosses_killed = 0;
             boost::optional<TimID> shooting = boost::none;
@@ -301,9 +304,11 @@ namespace Letvezi {
             void add_bullet(Velocity);
             void start_boss(int boss_id);
             void with_new_entity(std::function<std::shared_ptr<Entity::Type>(Entity::Name)> fn);
-            void add_points(uint32_t p);
-            void add_life(unsigned int li);
 
+            void do_damage(unsigned int dm);
+            void add_points(uint32_t p);
+            void add_shield(unsigned int sh);
+            void add_life(unsigned int li);
         };
         struct S_HighScores {
             Type& parent;
@@ -445,7 +450,7 @@ namespace Letvezi {
                         [&](std::shared_ptr<GameState::S_Running> run) {
                             if (run->shooting) {
                                 Velocity vel = Velocity(0,-120);
-                                vel = (1 + 0.4 * std::min(5,run->bullet_level)) * vel;
+                                vel = (1 + 0.4 * std::min(5,run->player.bullet_level)) * vel;
                                 run->add_bullet(vel);
                                 run->shooting = s.common.sdl_inf->tim.add_timer(100, *this);
                             } else {

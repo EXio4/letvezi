@@ -44,7 +44,7 @@ namespace Letvezi {
                                 160,
                                 165
                             };
-                            auto speed = Velocity(look[std::min(6, run->bullet_level)-1], 0);
+                            auto speed = Velocity(look[std::min(6, run->player.bullet_level)-1], 0);
                             auto zero  = Velocity(0,0);
                             switch(ev.dir) {
                                 case Left:
@@ -122,7 +122,7 @@ namespace Letvezi {
                                     *s.ms = run;
                                 }});
                                 menu.opts.push_back(GameState::MenuOption{"KILL MYSELF", [run](GameState::Type&) {
-                                    run->add_life(-run->lives);
+                                    run->add_life(-run->player.lives);
                                 }});
                                 menu.opts.push_back(GameState::MenuOption{"Credits",[](GameState::Type& s) {
                                     s.credits();
@@ -213,7 +213,7 @@ namespace Letvezi {
                     previous(prev) {};
 
         void S_Running::add_bullet(Velocity vel) {
-            int mx = std::min<int>(4,bullet_level);
+            int mx = std::min<int>(4,player.bullet_level);
             std::vector<int16_t> mp {
                                 00,
                                 30,
@@ -234,7 +234,7 @@ namespace Letvezi {
             parent.common.sdl_inf->play_sfx("player_laser");
         }
         void S_Running::add_points(uint32_t p) {
-            points += p;
+            player.points += p;
             til_boss -= p;
             if (til_boss <= 0) {
                 start_boss(1 + bosses_killed);
@@ -242,18 +242,38 @@ namespace Letvezi {
             };
         };
         void S_Running::add_life(unsigned int li) {
-            lives += li;
-            if (lives == 0) {
-                parent.common.persistent->high_scores.add_score(parent.common.persistent->user_data.player_name, points);
-                parent.high_scores(points, parent.menu_ms(MainMenu));
+            player.lives += li;
+            if (player.lives <= 0) {
+                parent.common.persistent->high_scores.add_score(parent.common.persistent->user_data.player_name, player.points);
+                parent.high_scores(player.points, parent.menu_ms(MainMenu));
             };
+            player.lives = std::min(player.lives, 125);
+        };
+        void S_Running::do_damage(unsigned int dm) {
+            if (player.shield >= 0) {
+                add_shield(dm * -2);
+            } else {
+                add_life(dm * -1);
+            }
+            player.damage_screen = 100;
+        };
+        void S_Running::add_shield(unsigned int sh) {
+            player.shield += sh;
+            if (player.shield < 0) {
+                auto d = player.shield;
+                player.shield = 0;
+                add_life(d);
+            } else if (player.shield > 100) {
+                add_life((player.shield-100)/5);
+                player.shield = 100;
+            }
         };
         void S_Running::start_boss(int boss_id) {
             for (int i=0; i<1+boss_id; i++) {
                 double  p  = parent.common.rng.d_dis_0_1 (parent.common.rng.random_eng);
                 int    pos = parent.common.res.width / 4 + p * 2 * parent.common.res.width/4;
                 with_new_entity([&](Entity::Name) {
-                    auto entity = std::make_shared<Entity::Enemy>(500, 3+2*std::min(5,bullet_level)*boss_id, true);
+                    auto entity = std::make_shared<Entity::Enemy>(500, 3+2*std::min(5,player.bullet_level)*boss_id, true);
                     entity->pos = Position(pos, 48);
                     entity->vel = Velocity(40,0);
                     entity->txt_name = "enemy_boss";
@@ -279,24 +299,24 @@ namespace Letvezi {
             with_new_entity([&](Entity::Name) {
                 int16_t x     = parent.common.rng.i_dis_0_width  (parent.common.rng.random_eng);
                 double  type  = parent.common.rng.d_dis_0_1      (parent.common.rng.random_eng);
-                int bullet_rel = std::min(bullet_level * 2, 45);
+                int bullet_rel = std::min(player.bullet_level * 2, 45);
                 // we don't let enemies spawn too past
                 x = std::min<int16_t>(x, parent.common.res.width - 100);
                 // we reuse the random number generator of the bg_particles, TODO: rename it
                 if (type > 0.9) {
-                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(300, 2 + 0.5 * bullet_level));
+                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(300, 2 + 0.5 * player.bullet_level));
                     entity->pos = Position(x, 2);
                     entity->vel = Velocity(0,55 + bullet_rel);
                     entity->txt_name = "enemy_3";
                     return entity;
                 } else if (type > 0.4) {
-                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(200, 1 + 0.35 * bullet_level));
+                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(200, 1 + 0.35 * player.bullet_level));
                     entity->pos = Position(x, 2);
                     entity->vel = Velocity(0,50 + bullet_rel);
                     entity->txt_name = "enemy_2";
                     return entity;
                 } else {
-                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(100, 1 + 0.25 * bullet_level));
+                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(100, 1 + 0.25 * player.bullet_level));
                     entity->pos = Position(x, 5);
                     entity->vel = Velocity(0,40 + bullet_rel);
                     entity->txt_name =   "enemy_1";
@@ -425,31 +445,27 @@ namespace Letvezi {
             return false;
         };
 
-        bool Collision::on_collision(std::shared_ptr<GameState::S_Running> run, Player& p, Enemy& e) {
+        bool Collision::on_collision(std::shared_ptr<GameState::S_Running> run, Player&, Enemy& e) {
             // TODO: balance tweaks, suggestions for this?
             e.kill();
-            if (p.shield <= 5) {
-                run->add_life(-1);
-                run->maybe_add_enemy(0.05);
-            };
+            run->do_damage(e.health * 3);
+            run->maybe_add_enemy(0.05);
             run->add_enemy();
             return true;
         };
-        bool Collision::on_collision(std::shared_ptr<GameState::S_Running> run, Player& pl, PowerUp& pup) {
+        bool Collision::on_collision(std::shared_ptr<GameState::S_Running> run, Player&, PowerUp& pup) {
             // TODO: powerups
             if (pup.kind == PowerUp::Shield) {
                 run->parent.common.sdl_inf->play_sfx("shield_enabled");
-                pl.shield += std::max(1500, 3000 - pl.shield/8);
+                run->add_shield(40);
             } else if (pup.kind == PowerUp::Bolt) {
-                run->bullet_level++;
+                run->player.bullet_level++;
             }
             pup.kill();
             return true;
         };
-        bool Collision::on_collision(std::shared_ptr<GameState::S_Running> run, Player& p, EnemyBullet& b) {
-            if (!p.shield) {
-                run->add_life(-1);
-            };
+        bool Collision::on_collision(std::shared_ptr<GameState::S_Running> run, Player&, EnemyBullet& b) {
+            run->do_damage(15);
             b.kill();
             return true;
         };
@@ -461,7 +477,7 @@ namespace Letvezi {
         };
 
         bool Collision::on_collision(std::shared_ptr<GameState::S_Running> run, Enemy& e, PlayerBullet& b) {
-            e.health -= ceil(run->bullet_level);
+            e.health -= ceil(run->player.bullet_level);
             b.kill();
             if (e.health <= 0) {
                 e.kill();
@@ -469,7 +485,7 @@ namespace Letvezi {
                     run->add_enemy();
                 }
                 run->maybe_add_enemy(0.05);
-                run->parent.maybe(0.05 * (1/(1+(run->bullet_level/6))), [&]() {
+                run->parent.maybe(0.05 * (1/(1+(run->player.bullet_level/6))), [&]() {
                     run->with_new_entity([&](Entity::Name) {
                         auto p = std::shared_ptr<Entity::PowerUp>(new Entity::PowerUp(Entity::PowerUp::Shield));
                         p->txt_name = "powerup_shield";
@@ -478,7 +494,7 @@ namespace Letvezi {
                         return p;
                     });
                 });
-                run->parent.maybe(0.1 * (1/(1+(run->bullet_level/4))), [&]() {
+                run->parent.maybe(0.1 * (1/(1+(run->player.bullet_level/4))), [&]() {
                     run->with_new_entity([&](Entity::Name) {
                         auto p = std::shared_ptr<Entity::PowerUp>(new Entity::PowerUp(Entity::PowerUp::Bolt));
                         p->txt_name = "powerup_bolt";
@@ -489,7 +505,7 @@ namespace Letvezi {
                 });
                 run->add_points(e.score*1.5);
             };
-            run->maybe_add_enemy(0.05 * 3/(1+run->bullet_level));
+            run->maybe_add_enemy(0.05 * 3/(1+run->player.bullet_level));
             run->add_points(e.score/4);
             return true;
         };

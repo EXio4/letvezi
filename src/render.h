@@ -20,11 +20,18 @@ namespace Letvezi {
             Position pos;
             std::string texture;
         };
+        struct HudRect {
+            Position p1;
+            Position p2;
+            SDL_Color col;
+            bool fill;
+        };
         class Hud {
         public:
             int start_hud = 0;
             std::vector<HudText> txts;
             std::vector<HudItem> items;
+            std::vector<HudRect> rects;
             Hud() {};
             void add_text(int x, int y, SDL_Color txt_color, std::string text) {
                 add_text(Position(x,y), txt_color, text);
@@ -34,6 +41,9 @@ namespace Letvezi {
             };
             void add_image(std::string txt_name, Position pos) {
                 items.push_back(HudItem{pos,txt_name});
+            };
+            void add_rect(HudRect r) {
+                rects.push_back(r);
             };
         };
 

@@ -4,7 +4,7 @@ namespace Game {
     sdl_info::sdl_info(const char* game_name, std::string font_name, int fps_param) {
             window = SDL_CreateWindow(game_name, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 0, 0, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
             if (window == NULL) { throw SDLError(); }
-            win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED );
+            win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
             if (fps_param > 0) fps = fps_param;
             fonts[Small]  = TTF_OpenFont(font_name.c_str(), 20);
             fonts[Normal] = TTF_OpenFont(font_name.c_str(), 24);
