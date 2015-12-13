@@ -93,13 +93,6 @@ namespace Letvezi {
                 hud.add_text(s.common.res.width - 256 - 32 , s.common.res.height - 48, txt_color, "Points:  " + std::to_string(run->player.points));
                 hud.add_text(48, s.common.res.height - 48, txt_color, std::to_string(run->player.health));
                 {
-                    /*                   std::vector<SDL_Color> colors {
-                                    {255,   0,   0, 255}, // 0  - 25
-                                    {255, 255,   0, 255}, // 25 - 50
-                                    {  0, 255,   0, 255}, // 50 - 75
-                                    {  0,   0, 255, 255}, // 75 -100
-                                    {255,   0, 255, 255}, // 100-125
-                            };*/
                     auto colors = [](int32_t x) {
                         auto limit = [](auto x) {
                             return std::max<decltype(x)>(0, std::min<decltype(x)>(255, x));
@@ -115,17 +108,17 @@ namespace Letvezi {
                         pos.x += 4;
                     };
                 }
-                hud.add_text(s.common.res.width - 512 - 32 * 6 , s.common.res.height - 48, txt_color, std::to_string(run->player.shield));
                 {
-                    Position pos(s.common.res.width - 512 - 32 * 4, s.common.res.height - 48);
+                    Position pos(s.common.res.width - 512 - 32*6 + (100 * 3), s.common.res.height - 48);
+                    hud.add_text(pos + Position(12, 0), txt_color, std::to_string(run->player.shield));
                     auto scolors = [](int32_t x) {
                         double w_ = 210 - 4 * (x/3);
                         uint8_t w = static_cast<uint8_t>(w_);
                         return SDL_Color {w, w, w, 255};
                     };
                     for (int32_t i=0; i < run->player.shield; i++) {
-                        hud.add_rect(HudRect{pos, {2,32}, scolors(i), false});
-                        pos.x += 2;
+                        pos.x -= 3;
+                        hud.add_rect(HudRect{pos, {3,32}, scolors(i), false});
                     }
                 };
                 render_hud(hud);
