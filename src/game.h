@@ -16,6 +16,49 @@
 
 namespace Game {
 
+    /*
+            load_png("bg_star"         , "art/img/bg_star.png"            );
+
+            load_png("player"          , "art/img/player.png"             );
+            load_png("player_laser"    , "art/img/player_laser.png"       );
+            load_png("player_life"     , "art/img/player_life.png"        );
+            load_png("player_shield"   , "art/img/player_shield.png"      );
+
+            load_png("enemy_1"         , "art/img/enemy_1.png"            );
+            load_png("enemy_2"         , "art/img/enemy_2.png"            );
+            load_png("enemy_3"         , "art/img/enemy_3.png"            );
+            load_png("enemy_boss"      , "art/img/enemy_boss.png"         );
+            load_png("enemy_laser"     , "art/img/enemy_laser.png"        );
+            load_png("enemy_boss_laser", "art/img/enemy_boss_laser.png"   );
+            load_png("enemy_boss_squad", "art/img/enemy_boss_squad.png"   );
+
+            load_png("powerup_shield"  , "art/img/powerup_shield.png"     );
+            load_png("powerup_bolt"    , "art/img/powerup_bolt.png"       );
+
+            load_sfx("player_laser"    , "art/sfx/player_laser.ogg"       );
+            load_sfx("shield_enabled"  , "art/sfx/player_laser.ogg"       );
+     */
+    enum TextureID {
+        TEX_BackgroundStar = 0x01,
+        TEX_Player         = 0x10,
+        TEX_PlayerLaser    = 0x11,
+        TEX_PlayerLife     = 0x12,
+        TEX_PlayerShield   = 0x13,
+        TEX_Enemy1         = 0x21,
+        TEX_Enemy2         = 0x22,
+        TEX_Enemy3         = 0x23,
+        TEX_EnemyBoss      = 0x25,
+        TEX_EnemyBossSquad = 0x26,
+        TEX_EnemyLaser     = 0x28,
+        TEX_EnemyBossLaser = 0x29,
+        TEX_PowerupShield  = 0x31,
+        TEX_PowerupBolt    = 0x32,
+    };
+    enum SFX_ID {
+        SFX_PlayerLaser   = 0x01,
+        SFX_ShieldEnabled = 0x02
+    };
+
     class SDLError: public std::runtime_error {
         private:
             std::string info;
@@ -97,12 +140,11 @@ namespace Game {
     class sdl_info {
     private:
             uint16_t fps = 60; /* fps >= 0 */
-            std::map<std::string, TextureInfo>  txts;
+            std::map<TextureID, TextureInfo>  txts;
             std::map<FontID,TTF_Font*> fonts;
-            std::map<std::string, Mix_Chunk*> sfx;
+            std::map<SFX_ID, Mix_Chunk*> sfx;
             std::string gm_name;
             Mix_Music* music;
-            /* std::string til I manage to stop being lazy */
         public:
             SDL_Window*   window        = NULL;
             SDL_Renderer* win_renderer  = NULL;
@@ -118,10 +160,10 @@ namespace Game {
 
             void set_background(std::string bg_name);
 
-            void load_png(std::string key, std::string path);
+            void load_png(TextureID key, std::string path);
 
-            void load_sfx(std::string key, std::string path);
-            void play_sfx(std::string key);
+            void load_sfx(SFX_ID key, std::string path);
+            void play_sfx(SFX_ID key);
 
             template <typename FN>
             void loading_screen(FN&& fn) {
@@ -166,16 +208,16 @@ namespace Game {
             void render_text(int x, int y, FontID f_id, SDL_Color txt_color, std::string text);
 
             template <typename F>
-            auto with(std::string key, F&& fn) {
+            auto with(TextureID key, F&& fn) {
                 auto it = txts.find(key);
-                if (it == txts.end()) { throw SDLError("[KEY] image not found: " + key); }
+                if (it == txts.end()) { throw SDLError("with TextureID couldn't find texture, did you load all the resources?"); }
                 auto surf = it->second;
 
                 /* we use .at as if it didn't exist, we already threw a nice error message */
                 return fn(surf);
             }
 
-            const std::map<std::string,TextureInfo>& textures() {
+            const std::map<TextureID,TextureInfo>& textures() {
                 return txts;
             }
 

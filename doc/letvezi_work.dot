@@ -1,0 +1,21 @@
+digraph Letvezi {
+    subgraph cluster_mainloop {
+        color=invis;
+        "MainLoop" "Apply acceleration" "Collision checking"
+    }
+    subgraph cluster_input_handler {
+        color=invis;
+        "Input Handler" "Change acceleration"
+    }
+    splines=polyline;
+    "Keyboard/Mouse" -> "Input Handler" [style=dashed]
+    "Input Handler" -> "Game State"
+    "Game State" -> "Render Loop"
+    "Render Loop" -> "Screen" [style=dashed]
+
+    "MainLoop" -> "Game State"         [dir=both]
+    "MainLoop" -> "Apply acceleration" [dir=both]
+    "MainLoop" -> "Collision checking" [dir=both]
+
+    "Change acceleration" -> "Input Handler" [dir=both]
+}

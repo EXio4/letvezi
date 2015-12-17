@@ -1,0 +1,79 @@
+digraph Letvezi {
+    subgraph cluster_main {
+            color=invis;
+            { rank=same; "Game State"; "Scene State"; }
+    }
+    subgraph cluster_common {
+            color=invis;
+            "Persistent Data";
+            "High Scores [on disk]" "User information";
+            "Extra";
+            "Background entities" "RNGs" "Defaults";
+            "Stars" "Player Position" "Resolution";
+    }
+    subgraph cluster_game_state {
+            color=invis;
+            "Running"  "Menu" "High Scores" "Credits" "Quit Game";
+            subgraph cluster_s_menu {
+                color=invis;
+                "Menu entries";
+            }
+            subgraph cluster_s_high_scores {
+                color=invis;
+                "Points";
+            }
+            subgraph cluster_s_running {
+                color=invis;
+                subgraph cluster_r_entities {
+                    "Entities"
+                    "Position" "Acceleration";
+                    { rank=same; "Position"; "Entities"; "Acceleration"; }
+                    "Player" "Enemy" "Powerups" "Enemy Bullet" "Player Bullet";
+                    "Enemy Health" "Shield Powerup" "Bullet Powerup";
+                    { rank=same; "Player"; "Enemy"; "Powerups"; "Enemy Bullet"; "Player Bullet"; };
+                    { rank=same; "Shield Powerup"; "Bullet Powerup"; };
+                };
+                subgraph cluster_r_player_info {
+                    "Player Information";
+                    "Current Points" "Health" "Shield" "Bullet Level";
+                };
+            }
+    }
+
+
+    rankdir=LR;
+    splines=polyline;
+    "Persistent Data" -> "High Scores [on disk]"
+    "Persistent Data" -> "User information"
+    "Extra" -> "Background entities"
+    "Background entities" -> "Stars"
+    "Extra" -> "RNGs"
+    "Extra" -> "Defaults"
+    "Defaults" -> "Player Position"
+    "Defaults" -> "Resolution"
+    "Game State" -> "Persistent Data"
+    "Game State" -> "Extra"
+    "Game State" -> "Scene State"
+    "Scene State" -> "Menu" [arrowhead=diamond]
+    "Scene State" -> "High Scores" [arrowhead=diamond]
+    "Scene State" -> "Credits" [arrowhead=diamond]
+    "Scene State" -> "Quit Game" [arrowhead=diamond]
+    "Scene State" -> "Running" [arrowhead=diamond]
+    "Menu" -> "Menu entries"
+    "High Scores" -> "Points" [style=dashed]
+    "High Scores" -> "Scene State" [xlabel="Previous State"]
+    "Credits" -> "Scene State" [xlabel="Previous State"]
+    "Running" -> "Entities"
+    "Running" -> "Player Information"
+    "Player Information" -> {"Current Points", "Health", "Shield", "Bullet Level"}
+    "Entities" -> "Player" [arrowhead=diamond]
+    "Entities" -> "Enemy"  [arrowhead=diamond]
+    "Entities" -> "Powerups" [arrowhead=diamond]
+    "Entities" -> "Player Bullet" [arrowhead=diamond]
+    "Entities" -> "Enemy Bullet" [arrowhead=diamond]
+    "Entities" -> "Position"
+    "Entities" -> "Acceleration"
+    "Enemy" -> "Enemy Health"
+    "Powerups" -> "Shield Powerup" [arrowhead=diamond]
+    "Powerups" -> "Bullet Powerup" [arrowhead=diamond]
+}

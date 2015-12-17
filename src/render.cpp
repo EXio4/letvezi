@@ -76,7 +76,7 @@ namespace Letvezi {
             }
             if (run->player.shield > 0) {
                 int alpha = std::min(255, 4 * run->player.shield);
-                render_pic(run->ent_mp[Entity::PlayerID()]->pos - Position(10,16), "player_shield", alpha);
+                render_pic(run->ent_mp[Entity::PlayerID()]->pos - Position(10,16), Game::TEX_PlayerShield, alpha);
             };
             {
                 if (run->player.damage_screen > 0) {
@@ -236,7 +236,7 @@ namespace Letvezi {
             return Game::KeepLooping;
         };
 
-        void Eng::render_pic(Position pos, std::string txt_name, uint8_t alpha) {
+        void Eng::render_pic(Position pos, Game::TextureID txt_name, uint8_t alpha) {
             sdl_inf->with(txt_name, [&](Game::TextureInfo text) {
                 SDL_Rect r;
                 r.x = pos.x;
@@ -277,7 +277,7 @@ namespace Letvezi {
                 SDL_SetRenderDrawColor(sdl_inf->win_renderer, 75, 0, 60, 255);
                 SDL_RenderClear(sdl_inf->win_renderer);
 
-                sdl_inf->with("bg_star", [&](Game::TextureInfo bg_star) {
+                sdl_inf->with(Game::TEX_BackgroundStar, [&](Game::TextureInfo bg_star) {
                     for(auto p = s.common.bg_particles.begin(); p != s.common.bg_particles.end() ;) {
                         apply_velocity(p->pos, p->vel, s.common.res, fps_relation);
                         SDL_Rect r {p->pos.x, p->pos.y, bg_star.width, bg_star.height};

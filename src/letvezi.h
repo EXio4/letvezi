@@ -37,11 +37,11 @@ namespace Letvezi {
     void apply_velocity(Position& pos, Velocity vel, Game::Resolution res, int16_t fps_relation);
 
     struct Particle {
-        std::string txt_name;
+        Game::TextureID txt_name;
         Position pos;
         Velocity vel;
         double angle = 0;
-        Particle(std::string txt_name_p, Position pos_p, Velocity vel_p) : txt_name(txt_name_p), pos(pos_p), vel(vel_p) {
+        Particle(Game::TextureID txt_name_p, Position pos_p, Velocity vel_p) : txt_name(txt_name_p), pos(pos_p), vel(vel_p) {
         };
     };
 
@@ -92,7 +92,7 @@ namespace Letvezi {
 
         class Type {
             public:
-                std::string txt_name;
+                Game::TextureID txt_name;
                 bool killed = false;
                 Position pos = Position(0,0);
                 Velocity vel = Velocity(0,0);
@@ -121,7 +121,7 @@ namespace Letvezi {
                 Player(Position pos_, Velocity vel_) {
                     pos = pos_;
                     vel = vel_;
-                    txt_name = "player";
+                    txt_name = Game::TEX_Player;
                 };
                 void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
                 void out_of_screen(std::shared_ptr<GameState::S_Running>) {}; // impossible
@@ -300,8 +300,8 @@ namespace Letvezi {
             std::map<Entity::Name,std::shared_ptr<Entity::Type>> ent_mp;
             Entity::Name last_entity = Entity::Name(1);
             S_Running(Type& parent);
-            void add_enemy();
-            void maybe_add_enemy(double);
+            void add_enemy(bool bullets=true);
+            void maybe_add_enemy(double,bool bullets=true);
             void add_bullet(Velocity);
             void start_boss(int boss_id);
             void with_new_entity(std::function<std::shared_ptr<Entity::Type>(Entity::Name)> fn);

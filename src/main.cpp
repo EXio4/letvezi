@@ -39,17 +39,17 @@ int main() {
                                     )
                                 );
                             };
-            auto load_sfx = [&ch](std::string key, std::string file) {
+            auto load_sfx = [&ch](std::string key, Game::SFX_ID xkey, std::string file) {
                                 ch.push( std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         key,
-                                        [key,file](auto& gs) { gs.load_sfx(key,file); }
+                                        [xkey,file](auto& gs) { gs.load_sfx(xkey,file); }
                                     )
                                 );
                             };
-            auto load_png = [&ch](std::string key, std::string file) {
+            auto load_png = [&ch](std::string key, Game::TextureID xkey, std::string file) {
                                 ch.push( std::tuple<std::string,std::function<void(Game::sdl_info&)>>(
                                         key,
-                                        [key,file](auto& gs) { gs.load_png(key,file); }
+                                        [xkey,file](auto& gs) { gs.load_png(xkey,file); }
                                     )
                                 );
                             };
@@ -65,25 +65,26 @@ int main() {
 
             set_bg("art/background.ogg");
 
-            load_png("bg_star"         , "art/img/bg_star.png"            );
+            load_png("bg_star"         , Game::TEX_BackgroundStar   , "art/img/bg_star.png"            );
 
-            load_png("player"          , "art/img/player.png"             );
-            load_png("player_laser"    , "art/img/player_laser.png"       );
-            load_png("player_life"     , "art/img/player_life.png"        );
-            load_png("player_shield"   , "art/img/player_shield.png"      );
+            load_png("player"          , Game::TEX_Player           , "art/img/player.png"             );
+            load_png("player_laser"    , Game::TEX_PlayerLaser      , "art/img/player_laser.png"       );
+            load_png("player_life"     , Game::TEX_PlayerLife       , "art/img/player_life.png"        );
+            load_png("player_shield"   , Game::TEX_PlayerShield     , "art/img/player_shield.png"      );
 
-            load_png("enemy_1"         , "art/img/enemy_1.png"            );
-            load_png("enemy_2"         , "art/img/enemy_2.png"            );
-            load_png("enemy_3"         , "art/img/enemy_3.png"            );
-            load_png("enemy_boss"      , "art/img/enemy_boss.png"         );
-            load_png("enemy_laser"     , "art/img/enemy_laser.png"        );
-            load_png("enemy_boss_squad", "art/img/enemy_boss_squad.png"   );
+            load_png("enemy_1"         , Game::TEX_Enemy1           , "art/img/enemy_1.png"            );
+            load_png("enemy_2"         , Game::TEX_Enemy2           , "art/img/enemy_2.png"            );
+            load_png("enemy_3"         , Game::TEX_Enemy3           , "art/img/enemy_3.png"            );
+            load_png("enemy_boss"      , Game::TEX_EnemyBoss        , "art/img/enemy_boss.png"         );
+            load_png("enemy_laser"     , Game::TEX_EnemyLaser       , "art/img/enemy_laser.png"        );
+            load_png("enemy_boss_laser", Game::TEX_EnemyBossLaser   , "art/img/enemy_boss_laser.png"   );
+            load_png("enemy_boss_squad", Game::TEX_EnemyBossSquad   , "art/img/enemy_boss_squad.png"   );
 
-            load_png("powerup_shield"  , "art/img/powerup_shield.png"     );
-            load_png("powerup_bolt"    , "art/img/powerup_bolt.png"       );
+            load_png("powerup_shield"  , Game::TEX_PowerupShield    , "art/img/powerup_shield.png"     );
+            load_png("powerup_bolt"    , Game::TEX_PowerupBolt      , "art/img/powerup_bolt.png"       );
 
-            load_sfx("player_laser"    , "art/sfx/player_laser.ogg"       );
-            load_sfx("shield_enabled"  , "art/sfx/player_laser.ogg"       );
+            load_sfx("player_laser"    , Game::SFX_PlayerLaser      , "art/sfx/player_laser.ogg"       );
+            load_sfx("shield_enabled"  , Game::SFX_ShieldEnabled    , "art/sfx/player_laser.ogg"       );
             do_("user info", [persistent]() { persistent->load(); });
 
         });
@@ -91,7 +92,7 @@ int main() {
         Game::Resolution res = gs->get_current_res();
         Letvezi::GameState::Type start_state =
                    Letvezi::GameState::Type(persistent, gs, res,
-                            Letvezi::Position(res.width/2, res.height-70-gs->textures().at("player").height));
+                            Letvezi::Position(res.width/2, res.height-70-gs->textures().at(Game::TEX_Player).height));
 
         std::function<void(Conc::Chan<SDL_Event>&,Conc::Chan<Letvezi::Events::Type>&)> event_fn =
                 Letvezi::event_handler;

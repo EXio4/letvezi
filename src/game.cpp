@@ -41,7 +41,7 @@ namespace Game {
             Mix_VolumeMusic(MIX_MAX_VOLUME / 4);
     };
 
-    void sdl_info::load_png(std::string key, std::string path) {
+    void sdl_info::load_png(TextureID key, std::string path) {
             {
             auto it = txts.find(key);
             if (it != txts.end()) return;
@@ -55,11 +55,11 @@ namespace Game {
             inf.texture = texture;
     }
 
-    void sdl_info::load_sfx(std::string key, std::string path) {
+    void sdl_info::load_sfx(SFX_ID key, std::string path) {
         sfx[key] = Mix_LoadWAV(path.c_str());
     };
 
-    void sdl_info::play_sfx(std::string key) {
+    void sdl_info::play_sfx(SFX_ID key) {
         Mix_PlayChannel(-1, sfx[key], 0);
     };
 

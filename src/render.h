@@ -1,4 +1,5 @@
 #pragma once
+#include "game.h"
 #include "letvezi.h"
 
 namespace Letvezi {
@@ -18,7 +19,7 @@ namespace Letvezi {
         };
         struct HudItem {
             Position pos;
-            std::string texture;
+            Game::TextureID texture;
         };
         struct HudRect {
             Position p1;
@@ -39,7 +40,7 @@ namespace Letvezi {
             void add_text(Position pos, SDL_Color txt_color, std::string text, Game::FontID f_id=Game::Normal) {
                 txts.push_back(HudText{pos,f_id,text,txt_color});
             };
-            void add_image(std::string txt_name, Position pos) {
+            void add_image(Game::TextureID txt_name, Position pos) {
                 items.push_back(HudItem{pos,txt_name});
             };
             void add_rect(HudRect r) {
@@ -76,7 +77,7 @@ namespace Letvezi {
             void apply_Menu      (std::shared_ptr<GameState::S_Menu      >);
             void apply_Credits   (std::shared_ptr<GameState::S_Credits   >);
 
-            void render_pic(Position, std::string,uint8_t alpha=255);
+            void render_pic(Position, Game::TextureID,uint8_t alpha=255);
             void render_background();
             void render_hud(const Hud&);
         };
