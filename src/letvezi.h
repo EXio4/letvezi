@@ -100,6 +100,7 @@ namespace Letvezi {
                 void kill() {
                     killed = true;
                 };
+                Type(Game::TextureID txt_name) : txt_name(txt_name) {};
 
                 virtual void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int) = 0;
                 virtual void out_of_screen(std::shared_ptr<GameState::S_Running>) = 0;
@@ -107,21 +108,31 @@ namespace Letvezi {
 
         class PowerUp : public Type {
         public:
-            enum Type {
+            enum Kind {
                 Shield ,
                 Bolt   ,
             } kind;
-            PowerUp(Type kind) : kind(kind) {};
+            PowerUp(Kind kind) : Type(text(kind)), kind(kind)  {};
             void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
             void out_of_screen(std::shared_ptr<GameState::S_Running>);
+        private:
+            Game::TextureID text(Kind kind) {
+                switch (kind) {
+                    case Shield:
+                        return Game::TEX_PowerupShield;
+                        break;
+                    case Bolt:
+                        return Game::TEX_PowerupBolt;
+                        break;
+                };
+            };
         };
 
         class Player : public Type {
             public:
-                Player(Position pos_, Velocity vel_) {
+                Player(Position pos_, Velocity vel_) : Type(Game::TEX_Player) {
                     pos = pos_;
                     vel = vel_;
-                    txt_name = Game::TEX_Player;
                 };
                 void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
                 void out_of_screen(std::shared_ptr<GameState::S_Running>) {}; // impossible
@@ -129,7 +140,7 @@ namespace Letvezi {
 
         class PlayerBullet : public Type {
             public:
-                PlayerBullet() {};
+                PlayerBullet() : Type(Game::TEX_PlayerLaser) {};
 
                 void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
                 void out_of_screen(std::shared_ptr<GameState::S_Running>);
@@ -142,8 +153,8 @@ namespace Letvezi {
                 int health = 1;
                 int til_next_shoot = -1;
                 bool boss = false;
-                Enemy(int score, int health, bool boss=false) : score(score), health(health), boss(boss) {};
-                Enemy() {};
+                Enemy(Game::TextureID txt, int score, int health, bool boss=false) : Type(txt), score(score), health(health), boss(boss) {};
+                Enemy() : Type(Game::TEX_Enemy1) {};
 
                 void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
                 void out_of_screen(std::shared_ptr<GameState::S_Running>);
@@ -151,7 +162,7 @@ namespace Letvezi {
 
         class EnemyBullet : public Type {
             public:
-                EnemyBullet() {};
+                EnemyBullet(Game::TextureID txt) : Type(txt) {};
 
                 void extra_render(std::shared_ptr<GameState::S_Running>, std::shared_ptr<Game::sdl_info>, int);
                 void out_of_screen(std::shared_ptr<GameState::S_Running>);

@@ -178,8 +178,7 @@ namespace Letvezi {
             void operator() () {
                 if (!en->killed) {
                     run->with_new_entity([&](Entity::Name) {
-                        auto b = std::shared_ptr<Entity::EnemyBullet>(new Entity::EnemyBullet());
-                        b->txt_name = txt_name;
+                        auto b = std::shared_ptr<Entity::EnemyBullet>(new Entity::EnemyBullet(txt_name));
                         b->pos = en->pos + Position(55,40);
                         b->vel = Velocity(0, speed);
                         return b;
@@ -230,7 +229,6 @@ namespace Letvezi {
                     std::shared_ptr<Entity::PlayerBullet> entity = std::shared_ptr<Entity::PlayerBullet>(new Entity::PlayerBullet());
                     entity->pos        = ent_mp[Entity::PlayerID()]->pos;
                     entity->pos.x     += mp[i];
-                    entity->txt_name   = Game::TEX_PlayerLaser;
                     entity->vel        = vel;
                     return entity;
                 });
@@ -254,6 +252,7 @@ namespace Letvezi {
             player.health = std::min(player.health, 125);
         };
         void S_Running::do_damage(unsigned int dm) {
+            if (player.damage_screen > 0) return;
             if (player.shield >= 0) {
                 add_shield(dm * -2);
             } else {
@@ -277,10 +276,9 @@ namespace Letvezi {
                 double  p  = parent.common.rng.d_dis_0_1 (parent.common.rng.random_eng);
                 int    pos = parent.common.res.width / 4 + p * 2 * parent.common.res.width/4;
                 with_new_entity([&](Entity::Name) {
-                    auto entity = std::make_shared<Entity::Enemy>(500, 3+2*std::min(5,player.bullet_level)*boss_id, true);
+                    auto entity = std::make_shared<Entity::Enemy>(Game::TEX_EnemyBoss, 500, 3+2*std::min(5,player.bullet_level)*boss_id, true);
                     entity->pos = Position(pos, 48);
                     entity->vel = Velocity(40,0);
-                    entity->txt_name = Game::TEX_EnemyBoss;
                     parent.common.sdl_inf->tim.add_timer(400, EnemySh(this_, entity));
                     return entity;
                 });
@@ -289,10 +287,9 @@ namespace Letvezi {
                 double  p  = parent.common.rng.d_dis_0_1 (parent.common.rng.random_eng);
                 int pos = parent.common.res.width / 4 + p * 2 * parent.common.res.width/4;
                 with_new_entity([&](Entity::Name) {
-                    auto entity = std::make_shared<Entity::Enemy>(500, std::min(5,boss_id), true);
+                    auto entity = std::make_shared<Entity::Enemy>(Game::TEX_EnemyBossSquad, 500, std::min(5,boss_id), true);
                     entity->pos = Position(pos, 48 + 64);
                     entity->vel = Velocity(20, 100);
-                    entity->txt_name = Game::TEX_EnemyBossSquad;
                     parent.common.sdl_inf->tim.add_timer(200, EnemySh(this_, entity));
                     return entity;
                 });
@@ -308,24 +305,21 @@ namespace Letvezi {
                 x = std::min<int16_t>(x, parent.common.res.width - 100);
                 // we reuse the random number generator of the bg_particles, TODO: rename it
                 if (type > 0.9) {
-                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(300, 2 + 0.5 * player.bullet_level));
+                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(Game::TEX_Enemy3, 300, 2 + 0.5 * player.bullet_level));
                     entity->pos = Position(x, 2);
                     entity->vel = Velocity(0,95 + bullet_rel);
-                    entity->txt_name = Game::TEX_Enemy3;
                     if (bullets) parent.common.sdl_inf->tim.add_timer(400, EnemySh(this_, entity, Game::TEX_EnemyLaser));
                     return entity;
                 } else if (type > 0.4) {
-                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(200, 1 + 0.35 * player.bullet_level));
+                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(Game::TEX_Enemy2, 200, 1 + 0.35 * player.bullet_level));
                     entity->pos = Position(x, 2);
                     entity->vel = Velocity(0,85 + bullet_rel);
-                    entity->txt_name = Game::TEX_Enemy2;
                     if (bullets) parent.common.sdl_inf->tim.add_timer(400, EnemySh(this_, entity, Game::TEX_EnemyLaser));
                     return entity;
                 } else {
-                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(100, 1 + 0.25 * player.bullet_level));
+                    auto entity = std::shared_ptr<Entity::Enemy>(new Entity::Enemy(Game::TEX_Enemy1, 100, 1 + 0.25 * player.bullet_level));
                     entity->pos = Position(x, 5);
                     entity->vel = Velocity(0,70 + bullet_rel);
-                    entity->txt_name =  Game::TEX_Enemy1;
                     if (bullets) parent.common.sdl_inf->tim.add_timer(400, EnemySh(this_, entity, Game::TEX_EnemyLaser));
                     return entity;
                 } 
@@ -339,7 +333,7 @@ namespace Letvezi {
         void S_Running::with_new_entity(std::function<std::shared_ptr<Entity::Type>(Entity::Name)> fn) {
                 Entity::Name e = last_entity;
                 ++last_entity;
-                ent_mp[e] = fn(e);
+                ent_mp.insert(std::pair<Entity::Name, std::shared_ptr<Entity::Type>>(e, fn(e)));
         };
     };
     void event_handler(Conc::Chan<SDL_Event>&    sdl_events   ,
