@@ -41,8 +41,17 @@ digraph Letvezi {
     }
 
 
+
     rankdir=LR;
     splines=polyline;
+
+    "HUD" -> "HUD Text"
+    "HUD" -> "HUD Pictures"
+    "HUD" -> "HUD Rects"
+
+    "ENG" -> "ENG rendering functions"
+    "ENG" -> "ENG logic functions"
+
     "Persistent Data" -> "High Scores [on disk]"
     "Persistent Data" -> "User information"
     "Extra" -> "Background entities"
