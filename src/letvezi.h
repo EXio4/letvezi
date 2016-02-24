@@ -360,11 +360,14 @@ namespace Letvezi {
                 } rng;
 
                 Game::Resolution res;
+                double scale;
                 std::list<Particle> bg_particles;
                 struct {
                     Position player_original;
                 } cnt;
                 Common(std::shared_ptr<Persistent> persistent, std::shared_ptr<Game::sdl_info> sdl_inf, Game::Resolution res, Position player_original) : persistent(persistent), sdl_inf(sdl_inf), res(res), cnt{player_original} {
+                    scale = sqrt((res.width * res.height * 1.0) / (1280.0*720.0));
+                    std::cout << "Scale: " << scale << std::endl;
                     { std::random_device rd;
                         std::default_random_engine r_eg(rd());;
                         std::uniform_int_distribution<int16_t> start_pos(0, res.width); // start positions \x -> (x,0)

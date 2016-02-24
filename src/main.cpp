@@ -109,11 +109,10 @@ int main() {
         gs->loop(event_fn, game_fn, expensive_handler, render_fn, start_state);
         persistent->save();
         printf("Game over!\n");
-
-
     } catch (Game::SDLError& err) {
         printf("SDL Error: %s\n", err.what());
     }
+    std::cout << "SDL_Quit()" << std::endl;
     SDL_Quit();
 
     return 0;

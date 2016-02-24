@@ -103,8 +103,8 @@ namespace Letvezi {
                         return SDL_Color {static_cast<uint8_t>(r), static_cast<uint8_t>(g), static_cast<uint8_t>(b), 255};
                     };
                     Position pos(48 + 60, s.common.res.height - 48);
-                    for (int32_t i=0; i < run->player.health; i++) {
-                        hud.add_rect(HudRect{pos, {4,32}, colors(i), false});
+                    for (int32_t i=0; i < run->player.health / 2; i++) {
+                        hud.add_rect(HudRect{pos, {4,32}, colors(i*2), false});
                         pos.x += 4;
                     };
                 }
@@ -116,9 +116,9 @@ namespace Letvezi {
                         uint8_t w = static_cast<uint8_t>(w_);
                         return SDL_Color {w, w, w, 255};
                     };
-                    for (int32_t i=0; i < run->player.shield; i++) {
+                    for (int32_t i=0; i < run->player.shield / 2; i++) {
                         pos.x -= 3;
-                        hud.add_rect(HudRect{pos, {3,32}, scolors(i), false});
+                        hud.add_rect(HudRect{pos, {3,32}, scolors(i*2), false});
                     }
                 };
                 render_hud(hud);
@@ -140,6 +140,7 @@ namespace Letvezi {
                         hud.add_text(pos, player_name , r.name);
                         hud.add_text(pos + Position(s.common.res.width/3, 0) , points, std::to_string(r.points));
                         pos += Position(0,48);
+                        if (pos.y >= s.common.res.height - 120) break;
                     };
 
                 };
@@ -152,7 +153,7 @@ namespace Letvezi {
                 SDL_Color game_over_c {255, 0, 0, 255};
                 hud.add_text(48, s.common.res.height - 100, game_over_c, "GAME OVER");
                 SDL_Color game_over_c2 = {0,0,255,255};
-                hud.add_text(s.common.res.width/3, s.common.res.height - 48, game_over_c2, "Press [Return] to go back to the main menu");
+                hud.add_text(Position(32,s.common.res.height - 48), game_over_c2, "Press [Return] to go back to the main menu", Game::Small);
                 render_hud(hud);
             };
             return Game::KeepLooping;
@@ -183,13 +184,13 @@ namespace Letvezi {
                 Position rel = Position(0,0);
                 switch(i.first) {
                     case Game::Small:
-                            rel = Position(0,64);
+                            rel = Position(0,48);
                         break;
                     case Game::Normal:
-                            rel = Position(0,96);
+                            rel = Position(0,64);
                         break;
                     case Game::Huge:
-                            rel = Position(0,128);
+                            rel = Position(0,96);
                         break;
                 };
                 pos += rel;
@@ -210,7 +211,7 @@ namespace Letvezi {
                 SDL_Color other_option   {0,   0, 255, 255};
                 // TODO: see how we could deal with the menu w/o using a normal loop
                 // and still have an easy way to select the next/prev menu entry easily
-                Position pos(128, hud.start_hud + 128); // start pos
+                Position pos(120, hud.start_hud + 128); // start pos
                 for (uint16_t i=0; i<s_menu->menu.opts.size(); i++) {
                     auto c = s_menu->menu.opts[i];
                     if (i == s_menu->menu.current) {
@@ -227,10 +228,13 @@ namespace Letvezi {
                     } else {
                             hud.add_text(pos, other_option,   c.text);
                     };
-                    pos += Position(c.text.length() * (16+8) ,0);
+                    pos += Position(c.text.length() * 32 ,0);
+                    if (pos.x >= (s.common.res.width * 7) / 10) {
+                        pos = Position(120 + (i % 3) * 32, pos.y + 32);
+                    }
                 };
-                hud.add_text(Position(s.common.res.width - (512+256) , hud.start_hud + 256     ), pressed_option, "Left/Right keys = Move between options");
-                hud.add_text(Position(s.common.res.width - (512+256) , hud.start_hud + 256 + 32), pressed_option, "Space key       = Select current option");
+                hud.add_text(Position(s.common.res.width - (512+256) , pos.y + 32), pressed_option, "Left/Right keys = Move between options");
+                hud.add_text(Position(s.common.res.width - (512+256) , pos.y + 64), pressed_option, "Space key       = Select current option");
                 render_hud(hud);
             };
             return Game::KeepLooping;
@@ -241,8 +245,8 @@ namespace Letvezi {
                 SDL_Rect r;
                 r.x = pos.x;
                 r.y = pos.y;
-                r.w = text.width;
-                r.h = text.height;
+                r.w = text.width  * s.common.scale;
+                r.h = text.height * s.common.scale;
                 SDL_SetTextureAlphaMod(text.texture, alpha);
                 SDL_RenderCopy(sdl_inf->win_renderer, text.texture, NULL, &r);
             });

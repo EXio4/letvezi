@@ -6,9 +6,9 @@ namespace Game {
             if (window == NULL) { throw SDLError(); }
             win_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
             if (fps_param > 0) fps = fps_param;
-            fonts[Small]  = TTF_OpenFont(font_name.c_str(), 20);
-            fonts[Normal] = TTF_OpenFont(font_name.c_str(), 24);
-            fonts[Huge]   = TTF_OpenFont(font_name.c_str(), 32);
+            fonts[Small]  = TTF_OpenFont(font_name.c_str(), 16);
+            fonts[Normal] = TTF_OpenFont(font_name.c_str(), 20);
+            fonts[Huge]   = TTF_OpenFont(font_name.c_str(), 24);
             if (fonts[Small] == NULL || fonts[Normal] == NULL || fonts[Huge] == NULL) {
                 throw SDLError("Error loading fonts");
             };
@@ -30,9 +30,9 @@ namespace Game {
     }
 
     Resolution sdl_info::get_current_res() {
-        SDL_DisplayMode current;
-        SDL_GetCurrentDisplayMode(0, &current); // we assume nothing goes wrong..
-        return Resolution(current.w, current.h);
+        int w, h;
+        SDL_GetRendererOutputSize(win_renderer, &w, &h);
+        return Resolution(w, h);
     };
 
     void sdl_info::set_background(std::string bg_name) {
