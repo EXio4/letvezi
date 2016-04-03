@@ -281,7 +281,7 @@ namespace Letvezi {
                 double  p  = parent.common.rng.d_dis_0_1 (parent.common.rng.random_eng);
                 int    pos = parent.common.res.width / 4 + p * 2 * parent.common.res.width/4;
                 with_new_entity([&](Entity::Name) {
-                    auto entity = std::make_shared<Entity::Enemy>(Game::TEX_EnemyBoss, 500, 20+4*std::min(5,player.bullet_level)*boss_id, true);
+                    auto entity = std::make_shared<Entity::Enemy>(Game::TEX_EnemyBoss, 500, 180+40*std::min(5,player.bullet_level)*boss_id, true);
                     entity->pos = Position(pos, 48);
                     entity->vel = Velocity(40,0);
                     parent.common.sdl_inf->tim.add_timer(400, EnemySh(this_, entity));

@@ -103,8 +103,8 @@ namespace Letvezi {
                         return SDL_Color {static_cast<uint8_t>(r), static_cast<uint8_t>(g), static_cast<uint8_t>(b), 255};
                     };
                     Position pos(48 + 60, s.common.res.height - 48);
-                    for (int32_t i=0; i < run->player.health / 2; i++) {
-                        hud.add_rect(HudRect{pos, {4,32}, colors(i*2), false});
+                    for (int32_t i=0; i < run->player.health * run->parent.common.scale; i++) {
+                        hud.add_rect(HudRect{pos, {4,32}, colors((i * 1.0)/run->parent.common.scale), false});
                         pos.x += 4;
                     };
                 }
@@ -116,9 +116,9 @@ namespace Letvezi {
                         uint8_t w = static_cast<uint8_t>(w_);
                         return SDL_Color {w, w, w, 255};
                     };
-                    for (int32_t i=0; i < run->player.shield / 2; i++) {
+                    for (int32_t i=0; i < run->player.shield * run->parent.common.scale; i++) {
                         pos.x -= 3;
-                        hud.add_rect(HudRect{pos, {3,32}, scolors(i*2), false});
+                        hud.add_rect(HudRect{pos, {3,32}, scolors((i * 1.0) / run->parent.common.scale), false});
                     }
                 };
                 render_hud(hud);
