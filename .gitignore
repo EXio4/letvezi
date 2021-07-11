@@ -32,3 +32,6 @@ build/*
 
 # Game stuff
 user_info.dat
+
+# other stuff
+my.life
